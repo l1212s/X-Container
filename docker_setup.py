@@ -43,9 +43,7 @@ def install_dependencies():
   # idk if there's a bette way to do this
   if not os.path.exists("wrk"):
     call(['git', 'clone', 'https://github.com/wg/wrk.git'])
-    call(['cd', 'wrk'])
-    call(['make', '-j4'])
-    call(['cd', '..'])
+    call(['make', '-j4', '-C', 'wrk'])
 
 def setup_nginx_configuration(configuration_file_path):
   configuration = '''

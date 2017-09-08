@@ -3,6 +3,8 @@ import os
 import re
 import subprocess
 
+NGINX_CONTAINER_NAME = "nginx_container"
+
 def call(command):
   print('RUNNING COMMAND: ' + ' '.join(command))
   subprocess.call(command)
@@ -87,7 +89,7 @@ def setup_nginx_container():
   port = docker_port()
   if port == None:
     call([
-      'docker', 'run', '--name', 'nginx_container',
+      'docker', 'run', '--name', NGINX_CONTAINER_NAME,
       '-P', '-v', configuration_file_path + ':/etc/nginx/nginx.conf:ro',
       '-d', 'nginx'
     ])
@@ -108,11 +110,19 @@ def run_nginx_benchmark(num_connections, num_threads, duration, port, measure_pe
     command = ['perf', 'stat'] + command
   call(command)
 
+def destroy_nginx_container():
+  call(['docker', 'stop', NGINX_CONTAINER_NAME])
+  call(['docker', 'rm', NGINX_CONTAINER_NAME])
+
 def setup_docker(args):
   install_dependencies()
   if args.process == "nginx":
     port = setup_nginx_container()
   return port
+
+def destroy_docker(args):
+  if args.process == "nginx":
+    destroy_nginx_container()
 
 def run_docker_benchmarks(args, port, measure_performance):
   if args.process == "nginx":

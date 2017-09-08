@@ -35,8 +35,12 @@ def install_dependencies():
   if 'docker-ce' in packages:
     print('docker-ce has already been installed')
   else:
-    call(['curl', '-fsSL', 'https://download.docker.com/linux/ubuntu/gpg', '|', 'sudo', 'apt-key', 'add', '-'])
-    call(['add-apt-repository', '"deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"'])
+    call(['curl', '-fsSL', 'https://download.docker.com/linux/ubuntu/gpg', '|', 'apt-key', 'add -'])
+
+    command = 'add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"'
+    print('RUNNING COMMAND: ' + command)
+    subprocess.call(command, shell=True)
+
     call(['apt-get', 'update'])
     call(['apt-get', 'install', '-y', 'docker-ce'])
 
@@ -124,7 +128,7 @@ def destroy_docker(args):
 
 def run_docker_benchmarks(args, port, measure_performance):
   if args.process == "nginx":
-    run_nginx_benchmark(400, 12, 10, nginx_port, measure_performance)
+    run_nginx_benchmark(400, 12, 10, port, measure_performance)
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -135,3 +139,4 @@ if __name__ == '__main__':
   port = setup_docker(args)
   if args.task == "benchmark":
     run_docker_benchmarks(args, port, True)
+  destroy_docker(args)

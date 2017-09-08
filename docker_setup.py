@@ -49,17 +49,26 @@ def setup_nginx_container():
   port = results[0]
   return port
 
-def run_nginx_benchmark(num_connections, num_threads, duration, port):
-  subprocess.call(["./wrk -t" + num_threads " -c" + num_connections + " -d" + duration + "s http://localhost:" + port + "/index.html"])
+def run_nginx_benchmark(num_connections, num_threads, duration, port, measure_performance):
+  command = [
+    "./wrk",
+    "-t" + num_threads,
+    "-c" + num_connections,
+    "-d" + duration + "s",
+    "http://localhost:" + port + "/index.html"
+  ]
+  if measure_performance:
+    command = command + ["perf", "stat"]
+  subprocess.call(command)
 
 def setup_docker():
   install_dependencies()
   nginx_port = setup_nginx_container()
   return nginx_port
 
-def run_docker_benchmarks(nginx_port):
-  run_nginx_benchmark(400, 12, 10, nginx_port)
+def run_docker_benchmarks(nginx_port, measure_performance):
+  run_nginx_benchmark(400, 12, 10, nginx_port, measure_performance)
 
 if __name__ == '__main__':
   nginx_port = setup_docker()
-  run_docker_benchmarks(nginx_port)
+  run_docker_benchmarks(nginx_port, true)

@@ -10,6 +10,11 @@ def call(command):
   subprocess.call(command)
   print('')
 
+def shell_call(command):
+  print('RUNNING COMMAND: ' + command)
+  subprocess.call(command, shell=True)
+  print('')
+
 def get_known_packages():
   output = subprocess.check_output(['dpkg', '--get-selections']).decode('utf-8')
   lines = output.split('\n')
@@ -35,11 +40,8 @@ def install_dependencies():
   if 'docker-ce' in packages:
     print('docker-ce has already been installed')
   else:
-    call(['curl', '-fsSL', 'https://download.docker.com/linux/ubuntu/gpg', '|', 'apt-key', 'add -'])
-
-    command = 'add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"'
-    print('RUNNING COMMAND: ' + command)
-    subprocess.call(command, shell=True)
+    shell_call('curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -')
+    shell_call('add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"')
 
     call(['apt-get', 'update'])
     call(['apt-get', 'install', '-y', 'docker-ce'])

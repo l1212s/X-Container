@@ -4,6 +4,7 @@ import re
 import subprocess
 
 NGINX_CONTAINER_NAME = "nginx_container"
+MEMCACHED_CONTAINER_NAME = "memcached_container"
 
 def call(command):
   print('RUNNING COMMAND: ' + ' '.join(command))
@@ -78,28 +79,44 @@ http {
   f.write(configuration)
   f.close
 
-def docker_port():
+def docker_port(regex):
   output = subprocess.check_output(['docker', 'ps']).decode('utf-8')
-  results = re.findall('0.0.0.0:([0-9]+)->80/tcp', output)
+  results = re.findall(regex, output)
   if len(results) == 0:
     return None
   else:
     return results[0]
 
+def nginx_docker_port():
+  return docker_port('0.0.0.0:([0-9]+)->80/tcp')
+
+def memcached_docker_port():
+  return docker_port('([0-9]+)/tcp')
+
 def setup_nginx_container():
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
-  port = docker_port()
+  port = nginx_docker_port()
   if port == None:
     call([
       'docker', 'run', '--name', NGINX_CONTAINER_NAME,
       '-P', '-v', configuration_file_path + ':/etc/nginx/nginx.conf:ro',
       '-d', 'nginx'
     ])
-    port = docker_port()
+    port = nginx_docker_port()
  
   print("NGINX running on port " + port)
+  return port
+
+def setup_memcached_container():
+  port = memcached_docker_port()
+  if port == None:
+    # TODO: Way to pass in memcached parameters like memory size
+    shell_call('docker run --name memcached ' + MEMCACHED_CONTAINER_NAME + ' -d memcached -m 256'
+    port = memcached_docker_port()
+
+  print("memcached running on port " + port)
   return port
 
 def run_nginx_benchmark(num_connections, num_threads, duration, port, measure_performance):
@@ -122,6 +139,8 @@ def setup_docker(args):
   install_dependencies()
   if args.process == "nginx":
     port = setup_nginx_container()
+  else if args.process == "memcached":
+    port = setup_memcached_container()
   return port
 
 def destroy_docker(args):

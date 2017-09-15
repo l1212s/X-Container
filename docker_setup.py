@@ -121,7 +121,7 @@ def install_docker_dependencies():
     shell_call('apt-get update')
     shell_call('apt-get install -y docker-ce')
 
-  if args.task == 'benchmark':
+  if args.benchmark_address == 'benchmark':
     if args.process == 'nginx':
       if not os.path.exists('wrk'):
         shell_call('git clone https://github.com/wg/wrk.git')
@@ -143,40 +143,40 @@ def destroy_docker_container(name):
   shell_call('docker rm ' + name)
 
 def nginx_docker_port():
-  return docker_port('0.0.0.0:([0-9]+)->80/tcp')
+  return docker_port('([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
 def memcached_docker_port():
-  return docker_port('([0-9]+)/tcp')
+  return docker_port('([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
 def setup_docker_nginx_container():
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
-  port = nginx_docker_port()
-  if port == None:
+  ports = nginx_docker_port()
+  if ports == None:
     shell_call('docker run --name {:s} -P -v {:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
-    port = nginx_docker_port()
+    ports = nginx_docker_port()
  
-  print("NGINX running on port " + port)
+  print("NGINX running on ports " + ports)
   return port
 
 def setup_docker_memcached_container():
-  port = memcached_docker_port()
-  if port == None:
+  ports = memcached_docker_port()
+  if ports == None:
     # TODO: Way to pass in memcached parameters like memory size
     shell_call('docker run --name {:s} -d memcached -m 256'.format(MEMCACHED_CONTAINER_NAME))
-    port = memcached_docker_port()
+    ports = memcached_docker_port()
 
-  print("memcached running on port " + port)
-  return port
+  print("memcached running on ports " + ports)
+  return ports
 
 def docker_port(regex):
-  output = subprocess.check_output(['docker', 'ps']).decode('utf-8')
+  output = subprocess.check_output('docker port', shell=True).decode('utf-8')
   results = re.findall(regex, output)
   if len(results) == 0:
     return None
   else:
-    return results[0]
+    return list(results[0])
 
 def setup_docker(args):
   install_docker_dependencies()

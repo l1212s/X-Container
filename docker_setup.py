@@ -174,7 +174,7 @@ def setup_docker_memcached_container():
   ports = memcached_docker_port()
   if ports == None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {:s} -p 127.0.0.1:{:d}:{:d} -d memcached -m 256'
+    shell_call('docker run --name {:s} -p 0.0.0.0:{:d}:{:d} -d memcached -m 256'
       .format(MEMCACHED_CONTAINER_NAME, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
     )
     ports = memcached_docker_port()

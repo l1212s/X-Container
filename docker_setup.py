@@ -269,9 +269,9 @@ def start_linux_container(name):
 
 def setup_linux_nginx_container():
   start_linux_container(NGINX_CONTAINER_NAME)
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get update')
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y nginx') 
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'systemctl status nginx')
+  linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get update')
+  linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get install -y nginx') 
+  linux_container_execute_command(NGINX_CONTAINER_NAME, 'systemctl status nginx')
 
 def setup_linux_memcached_container():
   start_linux_container(MEMCACHED_CONTAINER_NAME)

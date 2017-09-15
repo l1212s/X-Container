@@ -179,12 +179,15 @@ def setup_docker_memcached_container():
   return ports
 
 def docker_port(name, regex):
-  output = subprocess.check_output('docker port {:s}'.format(name), shell=True).decode('utf-8')
-  results = re.findall(regex, output)
-  if len(results) == 0:
+  try:
+    output = subprocess.check_output('docker port {:s}'.format(name), shell=True).decode('utf-8')
+    results = re.findall(regex, output)
+    if len(results) == 0:
+      return None
+    else:
+      return list(results[0])
+  except subprocess.CalledProcessError as e:
     return None
-  else:
-    return list(results[0])
 
 def setup_docker(args):
   install_docker_dependencies()

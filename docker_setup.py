@@ -240,9 +240,9 @@ def setup_port_forwarding(machine_port, container_ip, container_port):
 
 def get_linux_container_ip(name):
   try:
-    output = subprocess.check_output('lxc-info -n {:s} -iH'.format(name))
+    output = subprocess.check_output('lxc-info -n {:s} -iH'.format(name), shell=True)
     return output.decode('utf-8').strip()
-  except FileNotFoundError as e:
+  except subprocess.CalledProcessError as e:
     return None
 
 def setup_linux(args):

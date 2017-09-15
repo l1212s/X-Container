@@ -250,21 +250,23 @@ def setup_linux(args):
   install_linux_dependencies()
   if args.process == "nginx":
     container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
+    container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
 
     if container_ip != None:
       return
 
-    container_port = setup_linux_nginx_container()
+    setup_linux_nginx_container()
     container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
   elif args.process == "memcached":
     container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
-    container_port = MEMCACHED_MACHINE_PORT
+    container_port = MEMCACHED_CONTAINER_PORT
+    machine_port = MEMCACHED_MACHINE_PORT
 
     if container_ip != None:
       return
 
-    container_port = setup_linux_memcached_container()
+    setup_linux_memcached_container()
     container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
   else:
     raise "setup_linux: Not implemented"

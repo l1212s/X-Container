@@ -241,7 +241,7 @@ def get_linux_container_ip(name):
   try:
     output = subprocess.check_output('lxc-info -n {:s} -iH'.format(name))
     return output.decode('utf-8').strip()
-  except subprocess.CalledProcessError as e:
+  except FileNotFoundError as e:
     return None
 
 def setup_linux(args):

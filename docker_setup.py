@@ -157,7 +157,7 @@ def setup_docker_nginx_container():
     shell_call('docker run --name {:s} -P -v {:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
     ports = nginx_docker_port()
  
-  print("NGINX running on global port {:d}, container port {:d}".format(ports[0], ports[1]))
+  print("NGINX running on global port {:s}, container port {:s}".format(ports[0], ports[1]))
   return port
 
 def setup_docker_memcached_container():
@@ -167,7 +167,7 @@ def setup_docker_memcached_container():
     shell_call('docker run --name {:s} -d memcached -m 256'.format(MEMCACHED_CONTAINER_NAME))
     ports = memcached_docker_port()
 
-  print("memcached running on global port {:d}, container port {:d}".format(ports[0], ports[1]))
+  print("memcached running on global port {:s}, container port {:s}".format(ports[0], ports[1]))
   return ports
 
 def docker_port(name, regex):

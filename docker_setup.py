@@ -276,7 +276,7 @@ def start_linux_container(name):
 
 def linux_sleep():
   num_seconds = 5
-  print("Sleeping for {:d} seconds. Linux container network setup is slow....".format(num_Seconds))
+  print("Sleeping for {:d} seconds. Linux container network setup is slow....".format(num_seconds))
   time.sleep(num_seconds)
 
 def setup_linux_nginx_container():

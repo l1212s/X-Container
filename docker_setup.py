@@ -143,10 +143,10 @@ def destroy_docker_container(name):
   shell_call('docker rm ' + name)
 
 def nginx_docker_port():
-  return docker_port('([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
+  return docker_port(NGINX_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
 def memcached_docker_port():
-  return docker_port('([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
+  return docker_port(MEMCACHED_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
 def setup_docker_nginx_container():
   configuration_file_path = '/dev/nginx.conf'
@@ -170,8 +170,8 @@ def setup_docker_memcached_container():
   print("memcached running on ports " + ports)
   return ports
 
-def docker_port(regex):
-  output = subprocess.check_output('docker port', shell=True).decode('utf-8')
+def docker_port(name, regex):
+  output = subprocess.check_output('docker port {:s}'.format(name), shell=True).decode('utf-8')
   results = re.findall(regex, output)
   if len(results) == 0:
     return None

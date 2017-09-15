@@ -238,7 +238,7 @@ def setup_port_forwarding(machine_port, container_ip, container_port):
   shell_call('iptables -t nat -A POSTROUTING -p tcp -d {:s} --dport {:d} -j MASQUERADE'.format(container_ip, container_port))
 
 def get_linux_container_ip(name):
-  return subprocess.check_output('lxc-info -n %s -iH'.format(name))
+  return subprocess.check_output('lxc-info -n {:s} -iH'.format(name))
 
 def setup_linux(args):
   install_linux_dependencies()

@@ -158,7 +158,7 @@ def setup_docker_nginx_container():
     ports = nginx_docker_port()
  
   print("NGINX running on global port {:s}, container port {:s}".format(ports[0], ports[1]))
-  return port
+  return ports
 
 def setup_docker_memcached_container():
   ports = memcached_docker_port()

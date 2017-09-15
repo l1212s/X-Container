@@ -278,7 +278,7 @@ if __name__ == '__main__':
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
   parser.add_argument('-b', '--benchmark_address', type=str, help='Address to benchmark (localhost or 1.2.3.4)')
-  parser.add_argument('-d', '--destroy', default=False, help='Destroy associated container')
+  parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   args = parser.parse_args()
 
   if args.benchmark_address != None:

@@ -105,6 +105,14 @@ def run_benchmarks(args):
   elif args.process == "memcached":
     run_memcached_benchmark(args)
 
+def destroy_container(args):
+  if args.container == "docker":
+    destroy_docker(args)
+  elif args.container == "linux":
+    destroy_linux(args)
+  else:
+    raise "destroy_container: Not implemented"
+
 #################################################################################################
 # Docker specific
 #################################################################################################
@@ -270,12 +278,14 @@ if __name__ == '__main__':
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
   parser.add_argument('-b', '--benchmark_address', type=str, help='Address to benchmark (localhost or 1.2.3.4)')
+  parser.add_argument('-d', '--destroy', default=False, help='Destroy associated container')
   args = parser.parse_args()
 
   if args.benchmark_address != None:
     run_benchmarks(args) 
+  elif args.destroy:
+    destroy_container(args)
   elif args.container == "docker":
     port = setup_docker(args)
-    destroy_docker(args)
   elif args.container == "linux":
     setup_linux(args) 

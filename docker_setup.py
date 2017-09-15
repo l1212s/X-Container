@@ -249,15 +249,21 @@ def setup_linux(args):
   if args.process == "nginx":
     container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
     machine_port = NGINX_MACHINE_PORT
-    if container_ip == None:
-      container_port = setup_linux_nginx_container()
-      container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
+
+    if container_ip != None:
+      return
+
+    container_port = setup_linux_nginx_container()
+    container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
   elif args.process == "memcached":
     container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
     container_port = MEMCACHED_MACHINE_PORT
-    if container_ip == None:
-      container_port = setup_linux_memcached_container()
-      container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
+
+    if container_ip != None:
+      return
+
+    container_port = setup_linux_memcached_container()
+    container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
   else:
     raise "setup_linux: Not implemented"
   setup_port_forwarding(machine_port, container_ip, container_port)

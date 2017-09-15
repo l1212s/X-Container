@@ -235,6 +235,7 @@ def linux_container_execute_command(name, command):
   shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
 
 def setup_port_forwarding(machine_port, container_ip, container_port):
+  print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   shell_call('iptables -t nat -A PREROUTING -p tcp -i eth0 --dport {:d} -j DNAT --to-destination {:s}:{:d}'.format(machine_port, container_ip, container_port))
   shell_call('iptables -t nat -A POSTROUTING -p tcp -d {:s} --dport {:d} -j MASQUERADE'.format(container_ip, container_port))
 
@@ -267,6 +268,7 @@ def setup_linux(args):
     container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
   else:
     raise "setup_linux: Not implemented"
+  print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   setup_port_forwarding(machine_port, container_ip, container_port)
 
 def start_linux_container(name):

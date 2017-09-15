@@ -199,7 +199,7 @@ def docker_port(name, regex):
 def docker_ip(name):
   try:
     output = subprocess.check_output("docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' " + name, shell=True)
-    return output.strip()
+    return output.decode('utf-8').strip()
   except subprocess.CalledProcessError as e:
     return None
 

@@ -162,24 +162,27 @@ def setup_docker_nginx_container():
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
-  ports = nginx_docker_port()
-  if ports == None:
+  address = docker_ip(NGINX_CONTAINER_NAME)
+  if address == None:
     shell_call('docker run --name {:s} -P -v {:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
-    ports = nginx_docker_port()
+    address = docker_ip(NGINX_CONTAINER_NAME)
  
-  print("NGINX running on global port {:s}, container port {:s}".format(ports[0], ports[1]))
+  ports = nginx_docker_port()
+  print("NGINX running on global port {:s}, container address {:s} port {:s}".format(ports[0], address, ports[1]))
   return ports
 
 def setup_docker_memcached_container():
-  ports = memcached_docker_port()
-  if ports == None:
+  address = docker_ip(MEMCACHED_CONTAINER_NAME)
+  if address == None:
     # TODO: Way to pass in memcached parameters like memory size
     shell_call('docker run --name {:s} -p 0.0.0.0:{:d}:{:d} -d memcached -m 256'
       .format(MEMCACHED_CONTAINER_NAME, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
     )
-    ports = memcached_docker_port()
+    address = docker_ip(MEMCACHED_CONTAINER_NAME)
 
-  print("memcached running on global port {:s}, container port {:s}".format(ports[0], ports[1]))
+  ports = memcached_docker_port()
+
+  print("memcached running on global port {:s}, container address {:s} port {:s}".format(ports[0], address, ports[1]))
   return ports
 
 def docker_port(name, regex):
@@ -190,6 +193,13 @@ def docker_port(name, regex):
       return None
     else:
       return list(results[0])
+  except subprocess.CalledProcessError as e:
+    return None
+
+def docker_ip(name):
+  try:
+    output = subprocess.check_output("docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}} {:s}".format(name))
+    return output.strip()
   except subprocess.CalledProcessError as e:
     return None
 

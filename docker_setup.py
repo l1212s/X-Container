@@ -4,7 +4,9 @@ import re
 import subprocess
 
 NGINX_CONTAINER_NAME = "nginx_container"
+NGINX_MACHINE_PORT = 11100
 MEMCACHED_CONTAINER_NAME = "memcached_container"
+MEMCACHED_MACHINE_PORT = 11101
 
 #################################################################################################
 # Common functionality
@@ -66,18 +68,42 @@ http {
   f.write(configuration)
   f.close
 
-def run_nginx_benchmark(num_connections, num_threads, duration, port, measure_performance):
-  command = [
-    "wrk/wrk",
-    "-t{:d}".format(num_threads),
-    "-c{:d}".format(num_connections),
-    "-d{:d}s".format(duration),
-    "http://localhost:{:s}/index.html".format(port)
-  ]
-  if measure_performance:
-    command = ['perf', 'stat'] + command
-  call(command)
+def install_benchmark_dependencies(args):
+  if not os.path.exists('XcontainerBolt'):
+    shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
 
+  path = os.getcwd()
+
+  if args.process == 'nginx':
+    packages = get_known_packages()
+    install('libssl-dev', packages)
+    os.chdir('XcontainerBolt/wrk2')
+    shell_call('make')
+  elif args.process == 'memcached':
+    os.chdir('XcontainerBolt/mutated')
+    shell_call('git submodule update --init')
+    install('dh-autoreconf', packages)
+    shell_call('./autogen.sh')
+    shell_call('./configure')
+    shell_call('make')
+
+  os.chdir(path)
+
+def run_nginx_benchmark(args, num_connections, num_threads, duration):
+  shell_call('XContainerBolt/wrk2/wrk -t{:d} -c{:d} -d{:d}s http://{:s}:{:d}/index.html'
+	.format(num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT))
+
+def run_memcached_benchmark(args):
+  mutated_folder = 'XContainerBolt/mutated/client/'
+  shell_call('{:s}/load_memcache {:s}:{:d}'.format(mutated_folder, args.benchmark_address, MEMCACHED_MACHINE_PORT))
+  shell_call('{:s}/mutated_memcache {:s}:{:d}'.format(mutated_folder, args.benchmark_address, MEMCACHED_MACHINE_PORT))
+
+def run_benchmarks(args):
+  install_benchmark_dependencies(args)
+  if args.process == "nginx":
+    run_nginx_benchmark(args, 400, 12, 10)
+  elif args.process == "memcached":
+    run_memcached_benchmark(args)
 
 #################################################################################################
 # Docker specific
@@ -128,11 +154,7 @@ def setup_docker_nginx_container():
 
   port = nginx_docker_port()
   if port == None:
-    call([
-      'docker', 'run', '--name', NGINX_CONTAINER_NAME,
-      '-P', '-v', configuration_file_path + ':/etc/nginx/nginx.conf:ro',
-      '-d', 'nginx'
-    ])
+    shell_call('docker run --name {:s} -P -v {:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
     port = nginx_docker_port()
  
   print("NGINX running on port " + port)
@@ -142,7 +164,7 @@ def setup_docker_memcached_container():
   port = memcached_docker_port()
   if port == None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name ' + MEMCACHED_CONTAINER_NAME + ' -d memcached -m 256')
+    shell_call('docker run --name {:s} -d memcached -m 256'.format(MEMCACHED_CONTAINER_NAME))
     port = memcached_docker_port()
 
   print("memcached running on port " + port)
@@ -186,12 +208,26 @@ def install_linux_dependencies():
 def linux_container_execute_command(name, command):
   shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
 
+def setup_port_forwarding(machine_port, container_ip, container_port):
+  shell_call('iptables -t nat -A PREROUTING -p tcp -i eth0 --dport {:d} -j DNAT --to-destination {:s}:{:d}'.format(client_port, container_ip, container_port))
+  shell_call('iptables -t nat -A POSTROUTING -p tcp -d {:s} --dport {:d} -j MASQUERADE'.format(container_ip, container_port))
+
+def get_linux_container_ip(name):
+  return subprocess.check_output('lxc-info -n %s -iH'.format(name))
+
 def setup_linux(args):
   install_linux_dependencies()
   if args.process == "nginx":
-    raise "have not implemented linux nginx setup"  
+    container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
+    container_port = setup_linux_nginx_container()
+    machine_port = NGINX_MACHINE_PORT
   elif args.process == "memcached":
-    setup_linux_memcached_container() 
+    container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
+    container_port = setup_linux_memcached_container()
+    container_port = MEMCACHED_MACHINE_PORT
+  else:
+    raise "setup_linux: Not implemented"
+  setup_port_forwarding(machine_port, container_ip, container_port)
 
 def start_linux_container(name):
   # TODO: Is this the template we want?
@@ -224,21 +260,22 @@ def destroy_linux(args):
 # Main
 #################################################################################################
   
-def run_docker_benchmarks(args, port, measure_performance):
-  if args.process == "nginx":
-    run_nginx_benchmark(400, 12, 10, port, measure_performance)
-
 if __name__ == '__main__':
+  # Example container setup
+  # python3 docker_setup.py -c docker -p nginx
+
+  # Example benchmark setup
+  # python docker_setup.py -p nginx -b 1.2.3.4
   parser = argparse.ArgumentParser()
-  parser.add_argument('-c', '--container', required=True, help='Indicate type of container (docker, linux)')
+  parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
-  parser.add_argument('-t', '--task', required=True, help='What task to run (benchmark, attack)')
+  parser.add_argument('-b', '--benchmark_address', type=str, help='Address to benchmark (localhost or 1.2.3.4)')
   args = parser.parse_args()
 
-  if args.container == "docker":
+  if args.benchmark_address != None:
+    run_benchmarks(args) 
+  elif args.container == "docker":
     port = setup_docker(args)
-    if args.task == "benchmark":
-      run_docker_benchmarks(args, port, True)
     destroy_docker(args)
   elif args.container == "linux":
     setup_linux(args) 

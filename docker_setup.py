@@ -234,7 +234,7 @@ def linux_container_execute_command(name, command):
   shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
 
 def setup_port_forwarding(machine_port, container_ip, container_port):
-  shell_call('iptables -t nat -A PREROUTING -p tcp -i eth0 --dport {:d} -j DNAT --to-destination {:s}:{:d}'.format(client_port, container_ip, container_port))
+  shell_call('iptables -t nat -A PREROUTING -p tcp -i eth0 --dport {:d} -j DNAT --to-destination {:s}:{:d}'.format(machine_port, container_ip, container_port))
   shell_call('iptables -t nat -A POSTROUTING -p tcp -d {:s} --dport {:d} -j MASQUERADE'.format(container_ip, container_port))
 
 def get_linux_container_ip(name):

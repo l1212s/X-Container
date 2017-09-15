@@ -5,8 +5,10 @@ import subprocess
 
 NGINX_CONTAINER_NAME = "nginx_container"
 NGINX_MACHINE_PORT = 11100
+NGINX_CONTAINER_PORT = 80
 MEMCACHED_CONTAINER_NAME = "memcached_container"
 MEMCACHED_MACHINE_PORT = 11101
+MEMCACHED_CONTAINER_PORT = 11211
 
 #################################################################################################
 # Common functionality
@@ -172,7 +174,9 @@ def setup_docker_memcached_container():
   ports = memcached_docker_port()
   if ports == None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {:s} -d memcached -m 256'.format(MEMCACHED_CONTAINER_NAME))
+    shell_call('docker run --name {:s} -p 127.0.0.1:{:d}:{:d} -d memcached -m 256'
+      .format(MEMCACHED_CONTAINER_NAME, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
+    )
     ports = memcached_docker_port()
 
   print("memcached running on global port {:s}, container port {:s}".format(ports[0], ports[1]))

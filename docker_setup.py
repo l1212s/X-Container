@@ -105,6 +105,42 @@ def install_benchmark_dependencies(args):
 
   os.chdir(path)
 
+AVG_LATENCY = re.compile('.*Latency +([0-9\.a-z]+)')
+TAIL_LATENCY = re.compile('.*99\.999% +([0-9\.a-z]+)')
+THROUGHPUT = re.compile('.*Req/Sec +([0-9\.]+)')
+
+def parse_nginx_benchmark(file_name):
+  csv_file_name = file_name + ".csv"
+  f = open(file_name, "r")
+
+  regex_exps = [AVG_LATENCY, TAIL_LATENCY, THROUGHPUT]
+  results = ["N/A"] * 3
+  avg_latency = "N/A"
+  tail_latency = "N/A"
+  throughput = "N/A"
+
+  for line in f.readlines():
+    for i in xrange(len(regex_exps)):
+      m = regex_exps[i].match(line)
+      if m != None:
+	results[i] = m.group(1)
+        break
+
+  print results
+  return results
+
+def save_benchmark_results(instance_folder, results):
+  avg_latency_file = open("{0:s}/avg_latency.csv".format(instance_folder), "w+")
+  tail_latency_file = open("{0:s}/tail_latency.csv".format(instance_folder), "w+")
+  throughput_file = open("{0:s}/throughput.csv".format(instance_folder), "w+")
+
+  files = [avg_latency_file, tail_latency_file, throughput_file]
+
+  for result in results:
+    rate = result[0]
+    for i in xrange(len(files)):
+      files[i].write("{0:d},{1:s}\n".format(rate, str(result[1][i])))
+
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
   shell_call("mkdir {0:s}".format(nginx_folder))
@@ -114,10 +150,14 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
   rates = [1, 10, 100, 500, 1000, 1500, 2000, 2500, 3000]
+  results = []
   for rate in rates:
-    benchmark_file = "r{0:d}-t{1:d}-c{2:d}-d{3:d}".format(rate, num_threads, num_connections, duration)
-    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s http://{4:s}:{5:d}/index.html > {6:s}/{7:s}'
-	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, instance_folder, benchmark_file), True)
+    benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
+    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s}:{5:d}/index.html > {6:s}'
+	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, benchmark_file), True)
+    results.append((rate, parse_nginx_benchmark(benchmark_file)))
+
+  save_benchmark_results(instance_folder, results)
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XContainerBolt/mutated/client/'
@@ -409,7 +449,7 @@ if __name__ == '__main__':
   # python3 docker_setup.py -c docker -p nginx
 
   # Example benchmark setup
-  # python docker_setup.py -p nginx -b 1.2.3.4
+  # python docker_setup.py -c docker -p nginx -b 1.2.3.4
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')

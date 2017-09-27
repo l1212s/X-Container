@@ -170,7 +170,7 @@ def setup_xcontainer_nginx_container():
   os.chdir('/root/experiments/native/compute06/docker')
   machine_ip = get_ip_address('em1')
   setup_port_forwarding(machine_ip, NGINX_MACHINE_PORT, xcontainer_ip, NGINX_CONTAINER_PORT, bridge_ip)
-  print 'Setup NGINX X-Container on {:s}:{:d}'.format(machine_ip, NGINX_MACHINE_PORT)
+  print 'Setup NGINX X-Container on {0:s}:{1:d}'.format(machine_ip, NGINX_MACHINE_PORT)
   print 'X-Container will take over this terminal....'
   shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s}'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME))
 

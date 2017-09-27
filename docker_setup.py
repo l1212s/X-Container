@@ -127,7 +127,7 @@ def run_memcached_benchmark(args):
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
   if args.process == "nginx":
-    run_nginx_benchmark(args, 400, 12, 10)
+    run_nginx_benchmark(args, 1, 1, 30)
   elif args.process == "memcached":
     run_memcached_benchmark(args)
 

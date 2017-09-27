@@ -107,7 +107,7 @@ def install_benchmark_dependencies(args):
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
   shell_call("mkdir {0:s}".format(nginx_folder))
-  date = shell_output('date +%F-%H-%M-%S')
+  date = shell_output('date +%F-%H-%M-%S').strip()
   instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
   shell_call("mkdir {0:1}".format(instance_folder))
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))

@@ -333,7 +333,10 @@ def linux_container_execute_command(name, command):
 def get_linux_container_ip(name):
   try:
     output = shell_output('lxc-info -n {:s} -iH'.format(name))
-    return output.decode('utf-8').strip()
+    output = output.decode('utf-8').strip()
+    if output == "":
+      return None
+    return output
   except subprocess.CalledProcessError as e:
     return None
 
@@ -365,7 +368,8 @@ def setup_linux(args):
   container_ip = get_linux_container_ip(name)
   shell_call("lxc config set {0:s} limits.cpu 1".format(name))
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
-  setup_port_forwarding(machine_port, container_ip, container_port)
+  machine_ip = get_ip_address('eno1')
+  setup_port_forwarding(machine_ip, machine_port, container_ip, container_port)
 
 def start_linux_container(name):
   # TODO: Is this the template we want?

@@ -20,7 +20,8 @@ XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 def shell_call(command, showCommand=False):
   if showCommand:
     print('RUNNING COMMAND: ' + command)
-  subprocess.Popen(command, shell=True)
+  p = subprocess.Popen(command, shell=True)
+  p.wait()
   if showCommand:
     print('')
 

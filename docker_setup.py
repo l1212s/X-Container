@@ -78,6 +78,8 @@ http {
   f.close
 
 def install_benchmark_dependencies(args):
+  shell_call("mkdir benchmark")
+
   if not os.path.exists('XcontainerBolt'):
     shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
 
@@ -99,8 +101,18 @@ def install_benchmark_dependencies(args):
   os.chdir(path)
 
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
-  shell_call('XContainerBolt/wrk2/wrk -t{:d} -c{:d} -d{:d}s http://{:s}:{:d}/index.html'
-	.format(num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT))
+  nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
+  shell_call("mkdir {0:s}".format(nginx_folder))
+  date = shell_output('date +%F-%H-%M-%S')
+  instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
+  shell_call("mkdir {0:1}".format(instance_folder))
+  print("Putting NGINX benchmarks in {0:s}".format(instance_folder)
+
+  rates = [1, 10, 100, 500, 1000, 1500, 2000, 2500, 3000]
+  for rate in xrange(rates):
+    benchmark_file = "r{0:d}-t{1:d}-c{2:d}-d{3:d}".format(rate, num_threads, num_connections, duration)
+    shell_call('XContainerBolt/wrk2/wrk -r{0:d} -t{1:d} -c{2:d} -d{3:d}s http://{4:s}:{5:d}/index.html > {6:s}/{7:s}'
+	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, instance_folder, benchmark_file))
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XContainerBolt/mutated/client/'

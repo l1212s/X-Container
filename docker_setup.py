@@ -177,7 +177,7 @@ def generate_xcontainer_ip(bridge_ip):
   return ".".join(parts)
 
 def setup_xcontainer_nginx_container():
-  setup_docker_nginx_container(XCONTAINER_INSPECT_FILTER)
+  setup_docker_nginx_container(XCONTAINER_INSPECT_FILTER, True)
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(NGINX_CONTAINER_NAME)).strip()
   bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
@@ -248,13 +248,16 @@ def nginx_docker_port():
 def memcached_docker_port():
   return docker_port(MEMCACHED_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
-def setup_docker_nginx_container(docker_filter):
+def setup_docker_nginx_container(docker_filter, is_xcontainer=False):
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
+  cpu = "--cpus=1"
+  if is_xcontainer:
+    cpu = ""
   if address == None:
-    shell_call('docker run --name {0:s} -P --cpus="1" -v {1:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
+    shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
  

@@ -189,7 +189,7 @@ def setup_xcontainer_nginx_container():
   setup_port_forwarding(machine_ip, NGINX_MACHINE_PORT, xcontainer_ip, NGINX_CONTAINER_PORT, bridge_ip)
   print 'Setup NGINX X-Container on {0:s}:{1:d}'.format(machine_ip, NGINX_MACHINE_PORT)
   print 'X-Container will take over this terminal....'
-  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s}'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME))
+  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME))
 
 def setup_xcontainer(args):
   if args.process == "nginx":
@@ -254,7 +254,7 @@ def setup_docker_nginx_container(docker_filter):
 
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   if address == None:
-    shell_call('docker run --name {0:s} -P -v {1:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
+    shell_call('docker run --name {0:s} -P --cpus="1" -v {1:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
  
@@ -337,7 +337,8 @@ def get_linux_container_ip(name):
 def setup_linux(args):
   install_linux_dependencies()
   if args.process == "nginx":
-    container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
+    name = NGINX_CONTAINER_NAME
+    container_ip = get_linux_cntainer_ip(name)
     container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
 
@@ -345,9 +346,9 @@ def setup_linux(args):
       return
 
     setup_linux_nginx_container()
-    container_ip = get_linux_container_ip(NGINX_CONTAINER_NAME)
   elif args.process == "memcached":
-    container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
+    name = MEMCACHED_CONTAINER_NAME
+    container_ip = get_linux_container_ip(name)
     container_port = MEMCACHED_CONTAINER_PORT
     machine_port = MEMCACHED_MACHINE_PORT
 
@@ -355,9 +356,11 @@ def setup_linux(args):
       return
 
     setup_linux_memcached_container()
-    container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
   else:
     raise "setup_linux: Not implemented"
+
+  container_ip = get_linux_container_ip(name)
+  shell_call("lxc config set {0:s} limits.cpu 1".format(name)
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   setup_port_forwarding(machine_port, container_ip, container_port)
 

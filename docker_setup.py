@@ -115,7 +115,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   rates = [1, 10, 100, 500, 1000, 1500, 2000, 2500, 3000]
   for rate in rates:
     benchmark_file = "r{0:d}-t{1:d}-c{2:d}-d{3:d}".format(rate, num_threads, num_connections, duration)
-    shell_call('XContainerBolt/wrk2/wrk -r{0:d} -t{1:d} -c{2:d} -d{3:d}s http://{4:s}:{5:d}/index.html > {6:s}/{7:s}'
+    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s http://{4:s}:{5:d}/index.html > {6:s}/{7:s}'
 	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, instance_folder, benchmark_file), True)
 
 def run_memcached_benchmark(args):

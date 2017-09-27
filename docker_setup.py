@@ -360,7 +360,7 @@ def setup_linux(args):
     raise "setup_linux: Not implemented"
 
   container_ip = get_linux_container_ip(name)
-  shell_call("lxc config set {0:s} limits.cpu 1".format(name)
+  shell_call("lxc config set {0:s} limits.cpu 1".format(name))
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   setup_port_forwarding(machine_port, container_ip, container_port)
 

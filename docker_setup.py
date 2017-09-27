@@ -17,15 +17,19 @@ XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 # Common functionality
 #################################################################################################
 
-def shell_call(command):
-  print('RUNNING COMMAND: ' + command)
+def shell_call(command, showCommand=False):
+  if showCommand:
+    print('RUNNING COMMAND: ' + command)
   subprocess.Popen(command, shell=True)
-  print('')
+  if showCommand:
+    print('')
 
-def shell_output(command):
-  print('RUNNING COMMAND: ' + command)
+def shell_output(command, showCommand=False):
+  if showCommand:
+    print('RUNNING COMMAND: ' + command)
   output = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()[0]
-  print('')
+  if showCommand:
+    print('')
   return output
 
 def get_known_packages():
@@ -112,7 +116,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   for rate in xrange(rates):
     benchmark_file = "r{0:d}-t{1:d}-c{2:d}-d{3:d}".format(rate, num_threads, num_connections, duration)
     shell_call('XContainerBolt/wrk2/wrk -r{0:d} -t{1:d} -c{2:d} -d{3:d}s http://{4:s}:{5:d}/index.html > {6:s}/{7:s}'
-	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, instance_folder, benchmark_file))
+	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, instance_folder, benchmark_file), True)
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XContainerBolt/mutated/client/'

@@ -341,7 +341,7 @@ def setup_linux(args):
   install_linux_dependencies()
   if args.process == "nginx":
     name = NGINX_CONTAINER_NAME
-    container_ip = get_linux_cntainer_ip(name)
+    container_ip = get_linux_container_ip(name)
     container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
 

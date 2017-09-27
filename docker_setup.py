@@ -119,6 +119,8 @@ def destroy_container(args):
     destroy_docker(args)
   elif args.container == "linux":
     destroy_linux(args)
+  elif args.container == "xcontainer":
+    destroy_xcontainer(args)
   else:
     raise "destroy_container: Not implemented"
 
@@ -175,6 +177,16 @@ def setup_xcontainer_nginx_container():
 def setup_xcontainer(args):
   if args.process == "nginx":
     setup_xcontainer_nginx_container()
+
+def destroy_xcontainer_container(name):
+  shell_call("xl destroy {0:s}".format(name))
+  shell_call("docker rm {0:s}".format(name))
+
+def destroy_xcontainer(args):
+  if args.process == "nginx":
+    destroy_xcontainer_container(NGINX_CONTAINER_NAME)
+  elif args.process == "memcached":
+    destroy_xcontainer_container(MEMCACHED_CONTAINER_NAME)
 
 #################################################################################################
 # Docker specific

@@ -110,7 +110,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   date = shell_output('date +%F-%H-%M-%S')
   instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
   shell_call("mkdir {0:1}".format(instance_folder))
-  print("Putting NGINX benchmarks in {0:s}".format(instance_folder)
+  print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
   rates = [1, 10, 100, 500, 1000, 1500, 2000, 2500, 3000]
   for rate in xrange(rates):

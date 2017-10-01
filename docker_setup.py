@@ -185,7 +185,7 @@ def destroy_container(args):
 
 def setup(args):
   if args.container == "docker":
-    port = setup_docker(args)
+    setup_docker(args)
   elif args.container == "linux":
     setup_linux(args) 
   elif args.container == "xcontainer":
@@ -218,7 +218,7 @@ def generate_xcontainer_ip(bridge_ip):
   parts[-1] = str(new_last)
   return ".".join(parts)
 
-def setup_xcontainer_nginx_container():
+def setup_xcontainer_nginx_container(args):
   setup_docker_nginx_container(XCONTAINER_INSPECT_FILTER, True)
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(NGINX_CONTAINER_NAME)).strip()
   bridge_ip = get_ip_address('xenbr0')
@@ -231,11 +231,11 @@ def setup_xcontainer_nginx_container():
   setup_port_forwarding(machine_ip, NGINX_MACHINE_PORT, xcontainer_ip, NGINX_CONTAINER_PORT, bridge_ip)
   print 'Setup NGINX X-Container on {0:s}:{1:d}'.format(machine_ip, NGINX_MACHINE_PORT)
   print 'X-Container will take over this terminal....'
-  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME))
+  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME, args.cores))
 
 def setup_xcontainer(args):
   if args.process == "nginx":
-    setup_xcontainer_nginx_container()
+    setup_xcontainer_nginx_container(args)
 
 def destroy_xcontainer_container(name):
   shell_call("xl destroy {0:s}".format(name))
@@ -290,12 +290,12 @@ def nginx_docker_port():
 def memcached_docker_port():
   return docker_port(MEMCACHED_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
-def setup_docker_nginx_container(docker_filter, is_xcontainer=False):
+def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
-  cpu = "--cpus=1"
+  cpu = "--cpus={0:d}".format(args.cores)
   if is_xcontainer:
     cpu = ""
   if address == None:
@@ -345,10 +345,9 @@ def docker_ip(name, docker_filter):
 def setup_docker(args):
   install_docker_dependencies()
   if args.process == "nginx":
-    port = setup_docker_nginx_container(DOCKER_INSPECT_FILTER)
+    setup_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
   elif args.process == "memcached":
-    port = setup_docker_memcached_container()
-  return port
+    setup_docker_memcached_container()
 
 def destroy_docker(args):
   if args.process == "nginx":
@@ -405,7 +404,7 @@ def setup_linux(args):
     raise "setup_linux: Not implemented"
 
   container_ip = get_linux_container_ip(name)
-  shell_call("lxc config set {0:s} limits.cpu 1".format(name))
+  shell_call("lxc config set {0:s} limits.cpu {1:d}".format(name, args.cores))
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   setup_port_forwarding(machine_port, container_ip, container_port)
 
@@ -457,6 +456,7 @@ if __name__ == '__main__':
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
   parser.add_argument('-b', '--benchmark_address', type=str, help='Address and port to benchmark (localhost or 1.2.3.4:80)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
+  parser.add_argument('--cores', default=1, help='Number of cores')
   args = parser.parse_args()
 
   if args.benchmark_address != None:

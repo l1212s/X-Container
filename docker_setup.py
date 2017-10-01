@@ -60,6 +60,7 @@ def setup_nginx_configuration(configuration_file_path):
 user  nginx;
 worker_processes  1;
 
+access_log off;
 error_log  /var/log/nginx/error.log warn;
 pid        /var/run/nginx.pid;
 

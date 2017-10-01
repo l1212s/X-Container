@@ -5,7 +5,7 @@ import subprocess
 import time
 
 NGINX_CONTAINER_NAME = "nginx_container"
-NGINX_MACHINE_PORT = 11100
+NGINX_MACHINE_PORT = 80
 NGINX_CONTAINER_PORT = 80
 MEMCACHED_CONTAINER_NAME = "memcached_container"
 MEMCACHED_MACHINE_PORT = 11101
@@ -141,6 +141,8 @@ def save_benchmark_results(instance_folder, results):
     for i in xrange(len(files)):
       files[i].write("{0:d},{1:s}\n".format(rate, str(result[1][i])))
 
+MILLISECONDS_REGEX = re.compile("([0-9]\.])+ms")
+SECONDS_REGEX = re.compile("([0-9]\.])+s")
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
   shell_call("mkdir {0:s}".format(nginx_folder))
@@ -153,16 +155,16 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
-    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s}:{5:d}/index.html > {6:s}'
-	.format(rate, num_threads, num_connections, duration, args.benchmark_address, NGINX_MACHINE_PORT, benchmark_file), True)
+    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s}/index.html > {5:s}'
+	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
   save_benchmark_results(instance_folder, results)
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XContainerBolt/mutated/client/'
-  shell_call('{:s}/load_memcache {:s}:{:d}'.format(mutated_folder, args.benchmark_address, MEMCACHED_MACHINE_PORT))
-  shell_call('{:s}/mutated_memcache {:s}:{:d}'.format(mutated_folder, args.benchmark_address, MEMCACHED_MACHINE_PORT))
+  shell_call('{:s}/load_memcache {:s}'.format(mutated_folder, args.benchmark_address))
+  shell_call('{:s}/mutated_memcache {:s}'.format(mutated_folder, args.benchmark_address))
 
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
@@ -302,7 +304,7 @@ def setup_docker_nginx_container(docker_filter, is_xcontainer=False):
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
  
   ports = nginx_docker_port()
-  print("NGINX running on global port {0:s}, container address {1:s} port {2:s}".format(ports[0], address, ports[1]))
+  print("NGINX running on global port {0:s}, container address {1:s}".format(ports[1], address))
   return ports
 
 def setup_docker_memcached_container():
@@ -453,7 +455,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
-  parser.add_argument('-b', '--benchmark_address', type=str, help='Address to benchmark (localhost or 1.2.3.4)')
+  parser.add_argument('-b', '--benchmark_address', type=str, help='Address and port to benchmark (localhost or 1.2.3.4:80)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   args = parser.parse_args()
 

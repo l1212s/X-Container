@@ -347,7 +347,7 @@ def setup_linux(args):
     container_ip = get_linux_container_ip(name)
     container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
-
+    print("container ip", container_ip)
     if container_ip != None:
       return
 
@@ -369,7 +369,8 @@ def setup_linux(args):
   shell_call("lxc config set {0:s} limits.cpu 1".format(name))
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   machine_ip = get_ip_address('eno1')
-  setup_port_forwarding(machine_ip, machine_port, container_ip, container_port)
+  bridge_ip = get_ip_address('lxcbr0')
+  setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
 
 def start_linux_container(name):
   # TODO: Is this the template we want?
@@ -381,6 +382,7 @@ def linux_sleep(num_seconds):
   time.sleep(num_seconds)
 
 def setup_linux_nginx_container():
+  print("setting up")
   start_linux_container(NGINX_CONTAINER_NAME)
   linux_sleep(5)
   linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get update')

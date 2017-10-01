@@ -130,6 +130,9 @@ def parse_nginx_benchmark(file_name):
   print results
   return results
 
+MILLISECONDS_REGEX = re.compile("([0-9]\.])+ms")
+SECONDS_REGEX = re.compile("([0-9]\.])+s")
+
 def save_benchmark_results(instance_folder, results):
   avg_latency_file = open("{0:s}/avg_latency.csv".format(instance_folder), "w+")
   tail_latency_file = open("{0:s}/tail_latency.csv".format(instance_folder), "w+")
@@ -140,10 +143,14 @@ def save_benchmark_results(instance_folder, results):
   for result in results:
     rate = result[0]
     for i in xrange(len(files)):
-      files[i].write("{0:d},{1:s}\n".format(rate, str(result[1][i])))
+      measurement = str(result[1][i])
+      for regex in [MILLISECONDS_REGEX, SECONDS_REGEX]:
+        m = regex.match(measurement)
+        if m != None:
+	  meausrement = m.group(1)
+      measurement = float(measurement)
+      files[i].write("{0:d},{1:0.2f}\n".format(rate, measurement))
 
-MILLISECONDS_REGEX = re.compile("([0-9]\.])+ms")
-SECONDS_REGEX = re.compile("([0-9]\.])+s")
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
   shell_call("mkdir {0:s}".format(nginx_folder))

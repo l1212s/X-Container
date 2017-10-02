@@ -60,7 +60,6 @@ def setup_nginx_configuration(configuration_file_path):
 user  nginx;
 worker_processes  1;
 
-access_log off;
 error_log  /var/log/nginx/error.log warn;
 pid        /var/run/nginx.pid;
 
@@ -69,12 +68,13 @@ events {
 }
 
 http {
+    access_log off;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
     sendfile        off; # disable to avoid caching and volume mount issues
 
-    keepalive_timeout  65;
+    keepalive_timeout  120;
 
     include /etc/nginx/conf.d/*.conf;
 }
@@ -312,6 +312,9 @@ def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
  
   ports = nginx_docker_port()
+  machine_ip = get_ip_address('eno1')
+  bridge_ip = get_ip_address('docker0')
+  setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
   print("NGINX running on global port {0:s}, container address {1:s}".format(ports[1], address))
   return ports
 
@@ -420,6 +423,7 @@ def setup_linux(args):
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
   setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
+  print("To benchmark run 'python docker_setup.py -c linux -p nginx -b {0:s}:{1:d}'".format(machine_ip, machine_port))
 
 def start_linux_container(name):
   # TODO: Is this the template we want?
@@ -470,7 +474,7 @@ if __name__ == '__main__':
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
   parser.add_argument('-b', '--benchmark_address', type=str, help='Address and port to benchmark (localhost or 1.2.3.4:80)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
-  parser.add_argument('--cores', default=1, help='Number of cores')
+  parser.add_argument('--cores', type=int, default=1, help='Number of cores')
   args = parser.parse_args()
 
   if args.benchmark_address != None:

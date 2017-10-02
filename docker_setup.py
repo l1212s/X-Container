@@ -130,8 +130,11 @@ def parse_nginx_benchmark(file_name):
   print results
   return results
 
-MILLISECONDS_REGEX = re.compile("([0-9]\.])+ms")
-SECONDS_REGEX = re.compile("([0-9]\.])+s")
+NANOSECONDS_REGEX = re.compile("([0-9\.]+)us")
+MILLISECONDS_REGEX = re.compile("([0-9\.]+)ms")
+SECONDS_REGEX = re.compile("([0-9\.]+)s")
+MINUTE_REGEX = re.compile("([0-9\.]+)m$")
+NOT_AVAILABLE = re.compile("N/A")
 
 def save_benchmark_results(instance_folder, results):
   avg_latency_file = open("{0:s}/avg_latency.csv".format(instance_folder), "w+")
@@ -144,10 +147,16 @@ def save_benchmark_results(instance_folder, results):
     rate = result[0]
     for i in xrange(len(files)):
       measurement = str(result[1][i])
-      for regex in [MILLISECONDS_REGEX, SECONDS_REGEX]:
-        m = regex.match(measurement)
+      m = NOT_AVAILABLE.match(measurement)
+      if m != None:
+	files[i].write("{0:d},\n".format(rate))
+	continue
+      for regex in [(0.001, NANOSECONDS_REGEX), (1, MILLISECONDS_REGEX), (1000, SECONDS_REGEX), (60*1000, MINUTE_REGEX)]:
+        m = regex[1].match(measurement)
         if m != None:
-	  meausrement = m.group(1)
+          measurement = m.group(1)
+          measurement = float(measurement) * regex[0]
+	  break
       measurement = float(measurement)
       files[i].write("{0:d},{1:0.2f}\n".format(rate, measurement))
 
@@ -159,7 +168,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   shell_call("mkdir {0:1}".format(instance_folder))
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
-  rates = [1, 10, 100, 500, 1000, 1500, 2000, 2500, 3000]
+  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000]
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
@@ -177,7 +186,7 @@ def run_memcached_benchmark(args):
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
   if args.process == "nginx":
-    run_nginx_benchmark(args, 1, 1, 30)
+    run_nginx_benchmark(args, 1, 1, args.duration)
   elif args.process == "memcached":
     run_memcached_benchmark(args)
 
@@ -475,6 +484,7 @@ if __name__ == '__main__':
   parser.add_argument('-b', '--benchmark_address', type=str, help='Address and port to benchmark (localhost or 1.2.3.4:80)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   parser.add_argument('--cores', type=int, default=1, help='Number of cores')
+  parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
   args = parser.parse_args()
 
   if args.benchmark_address != None:

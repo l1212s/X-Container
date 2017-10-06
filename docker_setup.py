@@ -90,9 +90,9 @@ def install_benchmark_dependencies(args):
     shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
 
   path = os.getcwd()
+  packages = get_known_packages()
 
   if args.process == 'nginx':
-    packages = get_known_packages()
     install('libssl-dev', packages)
     os.chdir('XcontainerBolt/wrk2')
     shell_call('make')
@@ -111,7 +111,6 @@ TAIL_LATENCY = re.compile('.*99\.999% +([0-9\.a-z]+)')
 THROUGHPUT = re.compile('.*Req/Sec +([0-9\.]+)')
 
 def parse_nginx_benchmark(file_name):
-  csv_file_name = file_name + ".csv"
   f = open(file_name, "r")
 
   regex_exps = [AVG_LATENCY, TAIL_LATENCY, THROUGHPUT]
@@ -136,12 +135,10 @@ SECONDS_REGEX = re.compile("([0-9\.]+)s")
 MINUTE_REGEX = re.compile("([0-9\.]+)m$")
 NOT_AVAILABLE = re.compile("N/A")
 
-def save_benchmark_results(instance_folder, results):
-  avg_latency_file = open("{0:s}/avg_latency.csv".format(instance_folder), "w+")
-  tail_latency_file = open("{0:s}/tail_latency.csv".format(instance_folder), "w+")
-  throughput_file = open("{0:s}/throughput.csv".format(instance_folder), "w+")
-
-  files = [avg_latency_file, tail_latency_file, throughput_file]
+def save_benchmark_results(instance_folder, file_names, results):
+  print(instance_folder, file_names)
+  files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
+  print(files)
 
   for result in results:
     rate = result[0]
@@ -157,19 +154,34 @@ def save_benchmark_results(instance_folder, results):
           measurement = m.group(1)
           measurement = float(measurement) * regex[0]
 	  break
-      measurement = float(measurement)
-      files[i].write("{0:d},{1:0.2f}\n".format(rate, measurement))
+      try:
+        fmeasurement = float(measurement)
+        if measurement == str(fmeasurement):
+          files[i].write("{0:d},{1:0.2f}\n".format(rate, fmeasurement))
+        else:
+	  files[i].write("{0:d},{1:s}\n".format(rate, measurement))
+      except:
+        files[i].write("{0:d},{1:s}\n".format(rate, measurement))
+	
 
-def run_nginx_benchmark(args, num_connections, num_threads, duration):
-  nginx_folder = "benchmark/nginx-{0:s}".format(args.container)
+def get_rates(num_connections):
+  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000]
+  rates = filter(lambda x: x >= num_connections, rates)
+  return rates
+
+def create_benchmark_folder(process, container):
+  nginx_folder = "benchmark/{0:s}-{1:s}".format(process, container)
   shell_call("mkdir {0:s}".format(nginx_folder))
   date = shell_output('date +%F-%H-%M-%S').strip()
   instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
   shell_call("mkdir {0:1}".format(instance_folder))
+  return instance_folder
+
+def run_nginx_benchmark(args, num_connections, num_threads, duration):
+  instance_folder = create_benchmark_folder(args.process, args.container)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
-  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000]
-  rates = filter(lambda x: x >= num_connections, rates)
+  rates = get_rates(num_connections)
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
@@ -177,12 +189,57 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
 	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
-  save_benchmark_results(instance_folder, results)
+  result_files = ["throughput", "avg_latency", "tail_latency"]
+  save_benchmark_results(instance_folder, result_files, results)
+
+STATS = re.compile("([0-9]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)")
+BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\)")
+MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
+
+def parse_memcached_benchmark(file_name):
+  f = open(file_name, "r")
+  lines = f.readlines()
+
+  [throughput, rate] = lines[1].strip().split('\t')
+
+  m = STATS.match(lines[4].strip())
+  avg_rtt = m.group(2)
+  tail_rtt = m.group(5)
+
+  m = STATS.match(lines[7].strip())
+  avg_load_generator_queue = m.group(2)
+  tail_load_generator_queue = m.group(5)
+
+  m = BUFFER.match(lines[9].strip())
+  receive = m.group(2)
+  m = BUFFER.match(lines[10].strip())
+  transmit = m.group(2)
+
+  m = MISSED_SENDS.match(lines[11].strip())
+  missed_sends = m.group(3)
+
+  return (throughput, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends)
 
 def run_memcached_benchmark(args):
-  mutated_folder = 'XContainerBolt/mutated/client/'
-  shell_call('{:s}/load_memcache {:s}'.format(mutated_folder, args.benchmark_address))
-  shell_call('{:s}/mutated_memcache {:s}'.format(mutated_folder, args.benchmark_address))
+  mutated_folder = 'XcontainerBolt/mutated/client/'
+  num_keys = 10*1024
+  value_size = 4*1024
+  num_connections = args.connections
+
+  instance_folder = create_benchmark_folder(args.process, args.container)
+  print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
+
+  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(mutated_folder, num_keys, value_size, args.benchmark_address))
+
+  rates = get_rates(num_connections)
+  results = []
+  for rate in rates:
+    benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}".format(instance_folder, rate, num_connections, num_keys, value_size)
+    shell_call('{0:s}mutated_memcache -z {1:d} -v {2:d} -n {3:d} {4:s} {5:d} > {6:s}'.format(mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
+    results.append((rate, parse_memcached_benchmark(benchmark_file)))
+
+  result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
+  save_benchmark_results(instance_folder, result_files, results)
 
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
@@ -475,7 +532,7 @@ def destroy_linux(args):
 #################################################################################################
 # Main
 #################################################################################################
-  
+
 if __name__ == '__main__':
   # Example container setup
   # python3 docker_setup.py -c docker -p nginx
@@ -494,8 +551,8 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   if args.benchmark_address != None:
-    run_benchmarks(args) 
+    run_benchmarks(args)
   elif args.destroy:
     destroy_container(args)
   else:
-    setup(args) 
+    setup(args)

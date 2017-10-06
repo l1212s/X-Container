@@ -168,11 +168,12 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   shell_call("mkdir {0:1}".format(instance_folder))
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
-  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000]
+  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000]
+  rates = filter(lambda x: x >= num_connections, rates)
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
-    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s}/index.html > {5:s}'
+    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
 	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
@@ -186,7 +187,7 @@ def run_memcached_benchmark(args):
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
   if args.process == "nginx":
-    run_nginx_benchmark(args, 1, 1, args.duration)
+    run_nginx_benchmark(args, args.connections, args.threads, args.duration)
   elif args.process == "memcached":
     run_memcached_benchmark(args)
 
@@ -236,7 +237,7 @@ def generate_xcontainer_ip(bridge_ip):
   return ".".join(parts)
 
 def setup_xcontainer_nginx_container(args):
-  setup_docker_nginx_container(XCONTAINER_INSPECT_FILTER, True)
+  create_docker_nginx_container(args, XCONTAINER_INSPECT_FILTER, True)
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(NGINX_CONTAINER_NAME)).strip()
   bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
@@ -307,7 +308,7 @@ def nginx_docker_port():
 def memcached_docker_port():
   return docker_port(MEMCACHED_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
-def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
+def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
@@ -319,7 +320,10 @@ def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
     shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
- 
+  return address
+
+def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
+  address = create_docker_nginx_container(args, docker_filter, is_xcontainer)
   ports = nginx_docker_port()
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
@@ -485,6 +489,8 @@ if __name__ == '__main__':
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   parser.add_argument('--cores', type=int, default=1, help='Number of cores')
   parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
+  parser.add_argument('--connections', type=int, default=1, help='Number of client connections')
+  parser.add_argument('--threads', type=int, default=1, help='Number of threads')
   args = parser.parse_args()
 
   if args.benchmark_address != None:

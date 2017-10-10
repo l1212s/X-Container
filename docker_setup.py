@@ -86,19 +86,21 @@ def setup_nginx_configuration(configuration_file_path):
   f.close
 
 def install_benchmark_dependencies(args):
-  shell_call("mkdir benchmark")
-
-  if not os.path.exists('XcontainerBolt'):
-    shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+#  shell_call("mkdir benchmark")
 
   path = os.getcwd()
   packages = get_known_packages()
 
   if args.process == 'nginx':
+    if not os.path.exists('wrk2'):
+      shell_call('git clone https://github.com/sc2682cornell/wrk2.git')
     install('libssl-dev', packages)
-    os.chdir('XcontainerBolt/wrk2')
+    os.chdir('wrk2')
     shell_call('make')
   elif args.process == 'memcached':
+    if not os.path.exists('XcontainerBolt'):
+      shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+
     os.chdir('XcontainerBolt/mutated')
     shell_call('git submodule update --init')
     install('dh-autoreconf', packages)
@@ -110,7 +112,7 @@ def install_benchmark_dependencies(args):
 
 AVG_LATENCY = re.compile('.*Latency +([0-9\.a-z]+)')
 TAIL_LATENCY = re.compile('.*99\.999% +([0-9\.a-z]+)')
-THROUGHPUT = re.compile('.*Req/Sec +([0-9\.]+)')
+THROUGHPUT = re.compile('.*Requests/sec: +([0-9\.]+)')
 
 def parse_nginx_benchmark(file_name):
   f = open(file_name, "r")
@@ -138,9 +140,7 @@ MINUTE_REGEX = re.compile("([0-9\.]+)m$")
 NOT_AVAILABLE = re.compile("N/A")
 
 def save_benchmark_results(instance_folder, file_names, results):
-  print(instance_folder, file_names)
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
-  print(files)
 
   for result in results:
     rate = result[0]
@@ -148,27 +148,28 @@ def save_benchmark_results(instance_folder, file_names, results):
       measurement = str(result[1][i])
       m = NOT_AVAILABLE.match(measurement)
       if m != None:
-	files[i].write("{0:d},\n".format(rate))
+	files[i].write("{0:d},N/A\n".format(rate))
 	continue
       for regex in [(0.001, NANOSECONDS_REGEX), (1, MILLISECONDS_REGEX), (1000, SECONDS_REGEX), (60*1000, MINUTE_REGEX)]:
         m = regex[1].match(measurement)
         if m != None:
           measurement = m.group(1)
-          measurement = float(measurement) * regex[0]
+	  try:
+            measurement = float(measurement) * regex[0]
+	  except:
+	    measurement = "N/A"
 	  break
       try:
         fmeasurement = float(measurement)
         if measurement == str(fmeasurement):
           files[i].write("{0:d},{1:0.2f}\n".format(rate, fmeasurement))
         else:
-	  files[i].write("{0:d},{1:s}\n".format(rate, measurement))
+	  files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
       except:
-        files[i].write("{0:d},{1:s}\n".format(rate, measurement))
-
+        files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
 
 def get_rates(num_connections):
-  rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000]
-  rates = filter(lambda x: x >= num_connections, rates)
+  rates = range(5, 350, 5)
   return rates
 
 def create_benchmark_folder(process, container):
@@ -186,12 +187,13 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   rates = get_rates(num_connections)
   results = []
   for rate in rates:
+    rate = rate * num_connections
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
-    shell_call('XContainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
+    shell_call('wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
 	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
-  result_files = ["throughput", "avg_latency", "tail_latency"]
+  result_files = ["avg_latency", "tail_latency", "throughput"]
   save_benchmark_results(instance_folder, result_files, results)
 
 STATS = re.compile("([0-9]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)")
@@ -350,8 +352,9 @@ def install_docker_dependencies():
       if not os.path.exists('XcontainerBolt'):
         shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
         path = os.getcwd()
-        os.chdir('XcontainerBolt/mutated')
+        os.chdir('XcontainerBolt')
         shell_call('git submodule update --init')
+        os.chdir('mutated')
         install('dh-autoreconf', packages)
         shell_call('./autogen.sh')
         shell_call('./configure')

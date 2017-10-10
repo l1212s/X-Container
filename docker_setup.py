@@ -55,8 +55,8 @@ def install_common_dependencies(packages):
 def get_ip_address(name):
   return shell_output("/sbin/ifconfig {0:s} | grep 'inet addr:' | cut -d: -f2 | awk '{{ print $1 }}'".format(name)).strip()
 
-def setup_nginx_configuration(configuration_file_path):
-  configuration = '''
+def get_configuration():
+  return '''
 user  nginx;
 worker_processes  1;
 
@@ -79,8 +79,10 @@ http {
     include /etc/nginx/conf.d/*.conf;
 }
 '''
+
+def setup_nginx_configuration(configuration_file_path):
   f = open(configuration_file_path, 'w')
-  f.write(configuration)
+  f.write(get_configuration())
   f.close
 
 def install_benchmark_dependencies(args):
@@ -162,7 +164,7 @@ def save_benchmark_results(instance_folder, file_names, results):
 	  files[i].write("{0:d},{1:s}\n".format(rate, measurement))
       except:
         files[i].write("{0:d},{1:s}\n".format(rate, measurement))
-	
+
 
 def get_rates(num_connections):
   rates = [1, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000]
@@ -262,7 +264,7 @@ def setup(args):
   if args.container == "docker":
     setup_docker(args)
   elif args.container == "linux":
-    setup_linux(args) 
+    setup_linux(args)
   elif args.container == "xcontainer":
     setup_xcontainer(args)
   else:
@@ -322,6 +324,7 @@ def destroy_xcontainer(args):
   elif args.process == "memcached":
     destroy_xcontainer_container(MEMCACHED_CONTAINER_NAME)
 
+
 #################################################################################################
 # Docker specific
 #################################################################################################
@@ -370,36 +373,43 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   setup_nginx_configuration(configuration_file_path)
 
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
-  cpu = "--cpus={0:d}".format(args.cores)
+  if args.cores > 1:
+    raise "multi-core not implemented"
+  cpu = "--cpuset-cpus=0"
   if is_xcontainer:
     cpu = ""
   if address == None:
     shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
-  return address
-
-def setup_docker_nginx_container(args, docker_filter, is_xcontainer=False):
-  address = create_docker_nginx_container(args, docker_filter, is_xcontainer)
   ports = nginx_docker_port()
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
   setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
-  print("NGINX running on global port {0:s}, container address {1:s}".format(ports[1], address))
+  print("To benchmark run 'python docker_setup.py -c docker -p nginx -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
   return ports
 
-def setup_docker_memcached_container():
-  address = docker_ip(MEMCACHED_CONTAINER_NAME)
+def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
+  address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
+
+  if args.cores > 1:
+    raise "need to deal with multi-core"
+  cpu = "--cpuset-cpus 0"
+  if is_xcontainer:
+    cpu = ""
+
   if address == None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {:s} -p 0.0.0.0:{:d}:{:d} -d memcached -m 256'
-      .format(MEMCACHED_CONTAINER_NAME, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
+    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m 256'
+      .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
     )
-    address = docker_ip(MEMCACHED_CONTAINER_NAME)
+    address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
 
   ports = memcached_docker_port()
-
-  print("memcached running on global port {:s}, container address {:s} port {:s}".format(ports[0], address, ports[1]))
+  machine_ip = get_ip_address('eno1')
+  bridge_ip = get_ip_address('docker0')
+  setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
+  print("To benchmark run 'python docker_setup.py -c docker -p memcached -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
   return ports
 
 def docker_port(name, regex):
@@ -428,7 +438,7 @@ def setup_docker(args):
   if args.process == "nginx":
     setup_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
   elif args.process == "memcached":
-    setup_docker_memcached_container()
+    setup_docker_memcached_container(args, DOCKER_INSPECT_FILTER)
 
 def destroy_docker(args):
   if args.process == "nginx":
@@ -450,6 +460,8 @@ def install_linux_dependencies():
     install('lxc', packages)
 
 def linux_container_execute_command(name, command):
+  c = 'lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"'
+  print(c)
   shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
 
 def get_linux_container_ip(name):
@@ -488,7 +500,9 @@ def setup_linux(args):
     raise "setup_linux: Not implemented"
 
   container_ip = get_linux_container_ip(name)
-  shell_call("lxc config set {0:s} limits.cpu {1:d}".format(name, args.cores))
+  if args.cores > 1:
+	raise "Error need to implement logic for multiple cores"
+  shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus 0".format(name))
   print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
@@ -505,12 +519,17 @@ def linux_sleep(num_seconds):
   time.sleep(num_seconds)
 
 def setup_linux_nginx_container():
-  print("setting up")
   start_linux_container(NGINX_CONTAINER_NAME)
   linux_sleep(5)
   linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get update')
-  linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get install -y nginx') 
+  linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get install -y nginx')
   linux_container_execute_command(NGINX_CONTAINER_NAME, 'systemctl status nginx')
+  linux_container_execute_command(NGINX_CONTAINER_NAME, "sudo truncate -s0 /etc/nginx/nginx.config")
+
+  for line in get_configuration().split("\n"):
+    linux_container_execute_command(NGINX_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/nginx/nginx.config".format(line))
+  linux_container_execute_command(NGINX_CONTAINER_NAME, '/etc/init.d/nginx restart')
+
 
 def setup_linux_memcached_container():
   start_linux_container(MEMCACHED_CONTAINER_NAME)

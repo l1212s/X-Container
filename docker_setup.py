@@ -169,7 +169,8 @@ def save_benchmark_results(instance_folder, file_names, results):
         files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
 
 def get_rates(num_connections):
-  rates = range(5, 350, 5)
+  rates = range(5, 400, 5) # NGINX
+#  rates = range(500, 100000, 500)
   return rates
 
 def create_benchmark_folder(process, container):
@@ -189,7 +190,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   for rate in rates:
     rate = rate * num_connections
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
-    shell_call('wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
+    shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
 	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
@@ -571,6 +572,8 @@ if __name__ == '__main__':
   parser.add_argument('--connections', type=int, default=1, help='Number of client connections')
   parser.add_argument('--threads', type=int, default=1, help='Number of threads')
   args = parser.parse_args()
+  args.connections = 100
+  args.threads = 10
 
   if args.benchmark_address != None:
     run_benchmarks(args)

@@ -4,14 +4,15 @@ import re
 import subprocess
 import time
 
-NGINX_CONTAINER_NAME = "nginx_container"
+NGINX_CONTAINER_NAME = "nginx_container_script"
 NGINX_MACHINE_PORT = 80
 NGINX_CONTAINER_PORT = 80
 MEMCACHED_CONTAINER_NAME = "memcached_container"
 MEMCACHED_MACHINE_PORT = 11101
-MEMCACHED_CONTAINER_PORT = 11211
+MEMCACHED_CONTAINER_PORT = 11212
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
+PROCESSOR=19
 
 #################################################################################################
 # Common functionality
@@ -393,12 +394,32 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   print("To benchmark run 'python docker_setup.py -c docker -p nginx -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
   return ports
 
+
+def check_processor(args, name):
+  if args.container == "docker":
+    output = shell_output("docker inspect -f '{{.HostConfig.CpusetCpus}}' {0:s}".format(name)).strip()
+  elif args.container == "linux":
+    output = shell_output("lxc-cgroup -n {0:s} cpuset.cpus".format(name)).strip()
+  else:
+    raise Exception("check_processor: Not implemented")
+  if output != str(PROCESSOR):
+    raise Exception("Error. Container is not bound to processor {0:d}".format(PROCESSOR))
+
+def shell_output(command, showCommand=False):
+  if showCommand:
+    print('RUNNING COMMAND: ' + command)
+  output = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()[0]
+  if showCommand:
+    print('')
+  return output
+
+
 def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
 
   if args.cores > 1:
     raise "need to deal with multi-core"
-  cpu = "--cpuset-cpus 1"
+  cpu = "--cpuset-cpus {0:d}".format(PROCESSOR)
   if is_xcontainer:
     cpu = ""
 
@@ -408,7 +429,10 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
       .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
     )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
+  else:
+    shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
 
+  check_processor(args, MEMCACHED_CONTAINER_NAME)
   ports = memcached_docker_port()
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
@@ -440,7 +464,7 @@ def docker_ip(name, docker_filter):
 def setup_docker(args):
   install_docker_dependencies()
   if args.process == "nginx":
-    setup_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
+    create_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
   elif args.process == "memcached":
     setup_docker_memcached_container(args, DOCKER_INSPECT_FILTER)
 
@@ -485,29 +509,25 @@ def setup_linux(args):
     container_ip = get_linux_container_ip(name)
     container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
-    print("container ip", container_ip)
-    if container_ip != None:
-      return
-
-    setup_linux_nginx_container()
+    if container_ip == None:
+      setup_linux_nginx_container()
   elif args.process == "memcached":
     name = MEMCACHED_CONTAINER_NAME
     container_ip = get_linux_container_ip(name)
     container_port = MEMCACHED_CONTAINER_PORT
     machine_port = MEMCACHED_MACHINE_PORT
 
-    if container_ip != None:
-      return
-
-    setup_linux_memcached_container()
+    if container_ip == None:
+      setup_linux_memcached_container()
   else:
     raise "setup_linux: Not implemented"
 
   container_ip = get_linux_container_ip(name)
   if args.cores > 1:
 	raise "Error need to implement logic for multiple cores"
-  shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus 0".format(name))
-  print("machine port", machine_port, "container ip", container_ip, "container port", container_port)
+
+  shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, PROCESSOR))
+  check_processor(args, name)
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
   setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
@@ -534,13 +554,6 @@ def setup_linux_nginx_container():
     linux_container_execute_command(NGINX_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/nginx/nginx.config".format(line))
   linux_container_execute_command(NGINX_CONTAINER_NAME, '/etc/init.d/nginx restart')
 
-
-def setup_linux_memcached_container():
-  start_linux_container(MEMCACHED_CONTAINER_NAME)
-  linux_sleep(5)
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get update')
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y memcached')
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'memcached -u root &')
 
 def destroy_linux_container(name):
   shell_call('lxc-stop --name ' + name)

@@ -169,9 +169,13 @@ def save_benchmark_results(instance_folder, file_names, results):
       except:
         files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
 
-def get_rates(num_connections):
-  rates = range(5, 400, 5) # NGINX
-#  rates = range(500, 100000, 500)
+def get_rates(args, num_connections):
+  if args.process == "nginx":
+    rates = range(5, 400, 5)
+  elif args.process == "memcached":
+    rates = range(500, 100000, 500)
+  else:
+    raise "get_rates: not implemented"
   return rates
 
 def create_benchmark_folder(process, container):
@@ -186,7 +190,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   instance_folder = create_benchmark_folder(args.process, args.container)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
-  rates = get_rates(num_connections)
+  rates = get_rates(args, num_connections)
   results = []
   for rate in rates:
     rate = rate * num_connections
@@ -237,7 +241,7 @@ def run_memcached_benchmark(args):
 
   shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(mutated_folder, num_keys, value_size, args.benchmark_address))
 
-  rates = get_rates(num_connections)
+  rates = get_rates(args, num_connections)
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}".format(instance_folder, rate, num_connections, num_keys, value_size)

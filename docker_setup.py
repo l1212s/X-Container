@@ -12,11 +12,12 @@ MEMCACHED_MACHINE_PORT = 11101
 MEMCACHED_CONTAINER_PORT = 11212
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
-PROCESSOR=19
+PROCESSOR = 19
 
 #################################################################################################
 # Common functionality
 #################################################################################################
+
 
 def shell_call(command, showCommand=False):
   if showCommand:
@@ -26,6 +27,7 @@ def shell_call(command, showCommand=False):
   if showCommand:
     print('')
 
+
 def shell_output(command, showCommand=False):
   if showCommand:
     print('RUNNING COMMAND: ' + command)
@@ -34,6 +36,7 @@ def shell_output(command, showCommand=False):
     print('')
   return output
 
+
 def get_known_packages():
   output = shell_output('dpkg --get-selections').decode('utf-8')
   lines = output.split('\n')
@@ -41,11 +44,13 @@ def get_known_packages():
   packages = list(filter(lambda x: len(x) > 0, packages))
   return packages
 
+
 def install(package, known_packages):
   if package in known_packages:
     print(package + " has already been installed")
   else:
     shell_call('apt-get install -y {:s}'.format(package))
+
 
 def install_common_dependencies(packages):
   shell_call('apt-get update')
@@ -53,8 +58,10 @@ def install_common_dependencies(packages):
   install('make', packages)
   install('gcc', packages)
 
+
 def get_ip_address(name):
   return shell_output("/sbin/ifconfig {0:s} | grep 'inet addr:' | cut -d: -f2 | awk '{{ print $1 }}'".format(name)).strip()
+
 
 def get_configuration():
   return '''
@@ -81,13 +88,15 @@ http {
 }
 '''
 
+
 def setup_nginx_configuration(configuration_file_path):
   f = open(configuration_file_path, 'w')
   f.write(get_configuration())
   f.close
 
+
 def install_benchmark_dependencies(args):
-#  shell_call("mkdir benchmark")
+  shell_call("mkdir benchmark")
 
   path = os.getcwd()
   packages = get_known_packages()
@@ -111,9 +120,11 @@ def install_benchmark_dependencies(args):
 
   os.chdir(path)
 
+
 AVG_LATENCY = re.compile('.*Latency +([0-9\.a-z]+)')
 TAIL_LATENCY = re.compile('.*99\.999% +([0-9\.a-z]+)')
 THROUGHPUT = re.compile('.*Requests/sec: +([0-9\.]+)')
+
 
 def parse_nginx_benchmark(file_name):
   f = open(file_name, "r")
@@ -127,18 +138,20 @@ def parse_nginx_benchmark(file_name):
   for line in f.readlines():
     for i in xrange(len(regex_exps)):
       m = regex_exps[i].match(line)
-      if m != None:
-	results[i] = m.group(1)
+      if m is not None:
+        results[i] = m.group(1)
         break
 
-  print results
+  print(results)
   return results
+
 
 NANOSECONDS_REGEX = re.compile("([0-9\.]+)us")
 MILLISECONDS_REGEX = re.compile("([0-9\.]+)ms")
 SECONDS_REGEX = re.compile("([0-9\.]+)s")
 MINUTE_REGEX = re.compile("([0-9\.]+)m$")
 NOT_AVAILABLE = re.compile("N/A")
+
 
 def save_benchmark_results(instance_folder, file_names, results):
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
@@ -148,26 +161,26 @@ def save_benchmark_results(instance_folder, file_names, results):
     for i in xrange(len(files)):
       measurement = str(result[1][i])
       m = NOT_AVAILABLE.match(measurement)
-      if m != None:
-	files[i].write("{0:d},N/A\n".format(rate))
-	continue
+      if m is not None:
+        files[i].write("{0:d},N/A\n".format(rate))
+        continue
       for regex in [(0.001, NANOSECONDS_REGEX), (1, MILLISECONDS_REGEX), (1000, SECONDS_REGEX), (60*1000, MINUTE_REGEX)]:
         m = regex[1].match(measurement)
-        if m != None:
+        if m is not None:
           measurement = m.group(1)
-	  try:
-            measurement = float(measurement) * regex[0]
-	  except:
-	    measurement = "N/A"
-	  break
+        try:
+          measurement = float(measurement) * regex[0]
+        except Exception:
+          break
       try:
         fmeasurement = float(measurement)
         if measurement == str(fmeasurement):
           files[i].write("{0:d},{1:0.2f}\n".format(rate, fmeasurement))
         else:
-	  files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
-      except:
+          files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
+      except Exception:
         files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
+
 
 def get_rates(args, num_connections):
   if args.process == "nginx":
@@ -178,6 +191,7 @@ def get_rates(args, num_connections):
     raise "get_rates: not implemented"
   return rates
 
+
 def create_benchmark_folder(process, container):
   nginx_folder = "benchmark/{0:s}-{1:s}".format(process, container)
   shell_call("mkdir {0:s}".format(nginx_folder))
@@ -185,6 +199,7 @@ def create_benchmark_folder(process, container):
   instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
   shell_call("mkdir {0:1}".format(instance_folder))
   return instance_folder
+
 
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   instance_folder = create_benchmark_folder(args.process, args.container)
@@ -196,15 +211,17 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
     rate = rate * num_connections
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
     shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
-	.format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
+                .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
   result_files = ["avg_latency", "tail_latency", "throughput"]
   save_benchmark_results(instance_folder, result_files, results)
 
+
 STATS = re.compile("([0-9]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)")
 BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\)")
 MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
+
 
 def parse_memcached_benchmark(file_name):
   f = open(file_name, "r")
@@ -230,6 +247,7 @@ def parse_memcached_benchmark(file_name):
 
   return (throughput, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends)
 
+
 def run_memcached_benchmark(args):
   mutated_folder = 'XcontainerBolt/mutated/client/'
   num_keys = 10*1024
@@ -251,12 +269,14 @@ def run_memcached_benchmark(args):
   result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
   save_benchmark_results(instance_folder, result_files, results)
 
+
 def run_benchmarks(args):
   install_benchmark_dependencies(args)
   if args.process == "nginx":
     run_nginx_benchmark(args, args.connections, args.threads, args.duration)
   elif args.process == "memcached":
     run_memcached_benchmark(args)
+
 
 def destroy_container(args):
   if args.container == "docker":
@@ -478,6 +498,7 @@ def destroy_docker(args):
   elif args.process == "memcached":
     destroy_docker_container(MEMCACHED_CONTAINER_NAME)
 
+
 #################################################################################################
 # Linux specific
 #################################################################################################
@@ -535,7 +556,7 @@ def setup_linux(args):
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
   setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
-  print("To benchmark run 'python docker_setup.py -c linux -p nginx -b {0:s}:{1:d}'".format(machine_ip, machine_port))
+  print("To benchmark run 'python docker_setup.py -c linux -p {0:s} -b {1:s}:{2:d}'".format(args.process, machine_ip, machine_port))
 
 def start_linux_container(name):
   # TODO: Is this the template we want?
@@ -557,6 +578,14 @@ def setup_linux_nginx_container():
   for line in get_configuration().split("\n"):
     linux_container_execute_command(NGINX_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/nginx/nginx.config".format(line))
   linux_container_execute_command(NGINX_CONTAINER_NAME, '/etc/init.d/nginx restart')
+
+
+def setup_linux_memcached_container():
+  start_linux_container(MEMCACHED_CONTAINER_NAME)
+  linux_sleep(5)
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get update')
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y memcached')
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'memcached -u root &')
 
 
 def destroy_linux_container(name):

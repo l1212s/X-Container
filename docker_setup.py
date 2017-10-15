@@ -68,7 +68,7 @@ def get_configuration():
 user  nginx;
 worker_processes  1;
 
-error_log  /var/log/nginx/error.log warn;
+error_log  /dev/null crit;
 pid        /var/run/nginx.pid;
 
 events {
@@ -76,7 +76,8 @@ events {
 }
 
 http {
-    access_log off;
+    access_log  /dev/null;
+    error_log   /dev/null   crit;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
@@ -323,24 +324,29 @@ def generate_xcontainer_ip(bridge_ip):
   parts[-1] = str(new_last)
   return ".".join(parts)
 
-def setup_xcontainer_nginx_container(args):
-  create_docker_nginx_container(args, XCONTAINER_INSPECT_FILTER, True)
-  docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(NGINX_CONTAINER_NAME)).strip()
-  bridge_ip = get_ip_address('xenbr0')
-  xcontainer_ip = generate_xcontainer_ip(bridge_ip)
+def setup_xcontainer(args):
+  if args.process == "nginx":
+    name = NGINX_CONTAINER_NAME
+    container_port = NGINX_CONTAINER_PORT
+    machine_port = NGINX_MACHINE_PORT
+    create_docker_nginx_container(args, XCONTAINER_INSPECT_FILTER, True)
+  elif args.process == "memcached":
+    name = MEMCACHED_CONTAINER_NAME
+    container_port = MEMCACHED_CONTAINER_PORT
+    machine_port = MEMCACHED_MACHINE_PORT
+  else:
+    raise Exception("setup_xcontainer: not implemented")
 
-  shell_call('docker stop {0:s}'.format(NGINX_CONTAINER_NAME))
+  docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
+  xcontainer_ip = generate_xcontainer_ip(bridge_ip)
+  shell_call('docker stop {0:s}'.format(name))
   path = os.getcwd()
   os.chdir('/root/experiments/native/compute06/docker')
   machine_ip = get_ip_address('em1')
-  setup_port_forwarding(machine_ip, NGINX_MACHINE_PORT, xcontainer_ip, NGINX_CONTAINER_PORT, bridge_ip)
-  print 'Setup NGINX X-Container on {0:s}:{1:d}'.format(machine_ip, NGINX_MACHINE_PORT)
+  setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
+  print 'Setup {0:s} X-Container on {1:s}:{1:2}'.format(args.process, machine_ip, machine_port)
   print 'X-Container will take over this terminal....'
-  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, NGINX_CONTAINER_NAME, args.cores))
-
-def setup_xcontainer(args):
-  if args.process == "nginx":
-    setup_xcontainer_nginx_container(args)
+  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
 
 def destroy_xcontainer_container(name):
   shell_call("xl destroy {0:s}".format(name))
@@ -401,6 +407,7 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   configuration_file_path = '/dev/nginx.conf'
   setup_nginx_configuration(configuration_file_path)
 
+  print(NGINX_CONTAINER_NAME, docker_filter)
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   if args.cores > 1:
     raise "multi-core not implemented"
@@ -476,6 +483,7 @@ def docker_port(name, regex):
     return None
 
 def docker_ip(name, docker_filter):
+  print(docker_filter, name)
   try:
     output = shell_output("docker inspect -f '{0:s}' {1:s}".format(docker_filter, name))
     output = output.strip()

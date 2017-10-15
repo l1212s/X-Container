@@ -15,6 +15,7 @@ MEMCACHED_CONTAINER_PORT = 11212
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
+MEMCACHED_SIZE = 256
 
 
 class myThread (threading.Thread):
@@ -287,7 +288,7 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 def parse_memcached_results(args, instance_folder, num_connections, cores):
   rates = get_rates(args, num_connections)
   file_names = ["throughput", "avg_rtt", "tail_rtt"]
-  files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names) 
+  files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for rate in rates:
     sums = map(lambda f: 0.0, file_names)
@@ -295,13 +296,13 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
       benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
       core_results = parse_memcached_benchmark(benchmark_file)
       for i in range(len(sums)):
-	sums[i] += core_results[i]
-    files[0].write("{0:f},{1:d}\n".format(sums[0], rate)) 
+        sums[i] += core_results[i]
+    files[0].write("{0:f},{1:d}\n".format(sums[0], rate))
     for i in range(1, len(files)):
       files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))
- 
+
   for f in files:
-    f.close()   
+    f.close()
 
 
 def memcached_benchmark(results, instance_folder, num_connections, address, rate, core):
@@ -316,7 +317,7 @@ def run_memcached_benchmark(args):
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
-  #shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
+  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
 
   rates = get_rates(args, num_connections)
   results = []
@@ -332,12 +333,9 @@ def run_memcached_benchmark(args):
     run_parallel_instances(mem_funs)
   parse_memcached_results(args, instance_folder, num_connections, cores)
 
-  #result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
-  #save_benchmark_results(instance_folder, result_files, results)
-
 
 def run_benchmarks(args):
-  #install_benchmark_dependencies(args)
+  install_benchmark_dependencies(args)
   if args.process == "nginx":
     run_nginx_benchmark(args, args.connections, args.threads, args.duration)
   elif args.process == "memcached":
@@ -492,7 +490,8 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   if is_xcontainer:
     cpu = ""
   if address is None:
-    shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
+    command = 'docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'
+    shell_call(command.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   ports = nginx_docker_port()
@@ -525,8 +524,8 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m 256'
-               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
+    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d}'
+               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE)
                )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
@@ -639,6 +638,7 @@ def setup_linux(args):
   check_processor(args, name)
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
+  print("machine", machine_ip, machine_port, "container", container_ip, container_port, "bridge", bridge_ip)
   setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
   print("To benchmark run 'python docker_setup.py -c linux -p {0:s} -b {1:s}:{2:d}'".format(args.process, machine_ip, machine_port))
 
@@ -672,7 +672,10 @@ def setup_linux_memcached_container():
   linux_sleep(5)
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get update')
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y memcached')
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'memcached -u root &')
+  container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, '/etc/init.d/memcached stop')
+  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} &'
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip))
 
 
 def destroy_linux_container(name):

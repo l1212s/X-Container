@@ -379,7 +379,7 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   if args.cores > 1:
     raise "multi-core not implemented"
-  cpu = "--cpuset-cpus=0"
+  cpu = "--cpuset-cpus=1"
   if is_xcontainer:
     cpu = ""
   if address == None:
@@ -398,7 +398,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if args.cores > 1:
     raise "need to deal with multi-core"
-  cpu = "--cpuset-cpus 0"
+  cpu = "--cpuset-cpus 1"
   if is_xcontainer:
     cpu = ""
 

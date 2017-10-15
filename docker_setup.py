@@ -343,6 +343,7 @@ def setup_xcontainer(args):
   path = os.getcwd()
   os.chdir('/root/experiments/native/compute06/docker')
   machine_ip = get_ip_address('em1')
+  bridge_ip = get_ip_address('xenbr0')
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
   print 'Setup {0:s} X-Container on {1:s}:{1:2}'.format(args.process, machine_ip, machine_port)
   print 'X-Container will take over this terminal....'

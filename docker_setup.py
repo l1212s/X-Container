@@ -65,7 +65,7 @@ def get_ip_address(name):
 
 def get_configuration():
   return '''
-user  nginx;
+user  www-data;
 worker_processes  1;
 
 error_log  /dev/null crit;
@@ -176,34 +176,37 @@ def save_benchmark_results(instance_folder, file_names, results):
       try:
         fmeasurement = float(measurement)
         if measurement == str(fmeasurement):
-          files[i].write("{0:d},{1:0.2f}\n".format(rate, fmeasurement))
+          files[i].write("{0:f},{1:0.2f}\n".format(float(rate), fmeasurement))
         else:
-          files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
-      except Exception:
-        files[i].write("{0:d},{1:s}\n".format(rate, str(measurement)))
+	  files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
+      except:
+        files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
 
 
 def get_rates(args, num_connections):
   if args.process == "nginx":
-    rates = range(5, 400, 5)
+    rates = range(400, 500, 5)
   elif args.process == "memcached":
-    rates = range(500, 100000, 500)
+    rates = range(10000, 200000, 10000)
   else:
     raise "get_rates: not implemented"
   return rates
 
 
-def create_benchmark_folder(process, container):
+def get_date():
+  return shell_output('date +%F-%H-%M-%S').strip()
+
+
+def create_benchmark_folder(date, process, container):
   nginx_folder = "benchmark/{0:s}-{1:s}".format(process, container)
   shell_call("mkdir {0:s}".format(nginx_folder))
-  date = shell_output('date +%F-%H-%M-%S').strip()
   instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
   shell_call("mkdir {0:1}".format(instance_folder))
   return instance_folder
 
 
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
-  instance_folder = create_benchmark_folder(args.process, args.container)
+  instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
   rates = get_rates(args, num_connections)
@@ -224,7 +227,7 @@ BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\
 MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
 
 
-def parse_memcached_benchmark(file_name):
+def parse_memcached_benchmark(rate, file_name):
   f = open(file_name, "r")
   lines = f.readlines()
 
@@ -246,16 +249,17 @@ def parse_memcached_benchmark(file_name):
   m = MISSED_SENDS.match(lines[11].strip())
   missed_sends = m.group(3)
 
-  return (throughput, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends)
+  results = (float(throughput), (rate, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends))
+  return results
 
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XcontainerBolt/mutated/client/'
   num_keys = 10*1024
-  value_size = 4*1024
+  value_size = 200
   num_connections = args.connections
 
-  instance_folder = create_benchmark_folder(args.process, args.container)
+  instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
   shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(mutated_folder, num_keys, value_size, args.benchmark_address))
@@ -264,8 +268,8 @@ def run_memcached_benchmark(args):
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}".format(instance_folder, rate, num_connections, num_keys, value_size)
-    shell_call('{0:s}mutated_memcache -z {1:d} -v {2:d} -n {3:d} {4:s} {5:d} > {6:s}'.format(mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
-    results.append((rate, parse_memcached_benchmark(benchmark_file)))
+    shell_call('{0:s}mutated_memcache -z {1:d} -v {2:d} -n {3:d} -W 10000 {4:s} {5:d} > {6:s}'.format(mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
+    results.append(parse_memcached_benchmark(rate, benchmark_file))
 
   result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
   save_benchmark_results(instance_folder, result_files, results)
@@ -626,6 +630,7 @@ if __name__ == '__main__':
   parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
   parser.add_argument('--connections', type=int, default=1, help='Number of client connections')
   parser.add_argument('--threads', type=int, default=1, help='Number of threads')
+  parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
   args = parser.parse_args()
   args.connections = 100
   args.threads = 10

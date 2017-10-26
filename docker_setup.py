@@ -1,7 +1,9 @@
 import argparse
+import functools
 import os
 import re
 import subprocess
+import threading
 import time
 
 NGINX_CONTAINER_NAME = "nginx_container_script"
@@ -13,6 +15,26 @@ MEMCACHED_CONTAINER_PORT = 11212
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
+
+class myThread (threading.Thread):
+  def __init__(self, threadId, name, fun):
+    threading.Thread.__init__(self)
+    self.threadId = threadId
+    self.name = name
+    self.fun = fun
+
+  def run(self):
+    self.fun()
+
+def run_parallel_instances(fun):
+  threads = []
+  for i in range(len(fun)):
+    thread = myThread(i, "thread-{0:d}".format(i), fun[i])
+    thread.start()
+    threads.append(thread)
+
+  for t in threads:
+    t.join()
 
 #################################################################################################
 # Common functionality
@@ -68,7 +90,7 @@ def get_configuration():
 user  www-data;
 worker_processes  1;
 
-error_log  /dev/null crit;
+error_log  /var/log/nginx/error.log warn;
 pid        /var/run/nginx.pid;
 
 events {
@@ -76,8 +98,7 @@ events {
 }
 
 http {
-    access_log  /dev/null;
-    error_log   /dev/null   crit;
+    access_log  off;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
@@ -158,34 +179,38 @@ def save_benchmark_results(instance_folder, file_names, results):
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for result in results:
-    rate = result[0]
+    core = result[0]
+    rate = result[1]
     for i in xrange(len(files)):
-      measurement = str(result[1][i])
+      measurement = str(result[2][i])
       m = NOT_AVAILABLE.match(measurement)
       if m is not None:
         files[i].write("{0:d},N/A\n".format(rate))
         continue
       for regex in [(0.001, NANOSECONDS_REGEX), (1, MILLISECONDS_REGEX), (1000, SECONDS_REGEX), (60*1000, MINUTE_REGEX)]:
+        print("measurement", measurement)
         m = regex[1].match(measurement)
         if m is not None:
           measurement = m.group(1)
-        try:
-          measurement = float(measurement) * regex[0]
-        except Exception:
-          break
+          try:
+            measurement = float(measurement) * regex[0]
+          except Exception:
+	    print("exception")
+	  break
+      
       try:
         fmeasurement = float(measurement)
         if measurement == str(fmeasurement):
-          files[i].write("{0:f},{1:0.2f}\n".format(float(rate), fmeasurement))
+          files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
         else:
-	  files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
+	  files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
       except:
-        files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
+        files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
 
 
 def get_rates(args, num_connections):
   if args.process == "nginx":
-    rates = range(400, 500, 5)
+    rates = range(5, 500, 5)
   elif args.process == "memcached":
     rates = range(10000, 200000, 10000)
   else:
@@ -227,7 +252,7 @@ BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\
 MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
 
 
-def parse_memcached_benchmark(rate, file_name):
+def parse_memcached_benchmark(rate, core, file_name):
   f = open(file_name, "r")
   lines = f.readlines()
 
@@ -249,15 +274,22 @@ def parse_memcached_benchmark(rate, file_name):
   m = MISSED_SENDS.match(lines[11].strip())
   missed_sends = m.group(3)
 
-  results = (float(throughput), (rate, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends))
+  results = (core, float(throughput), (rate, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends))
   return results
 
+some_rlock = threading.RLock()
+
+def memcached_benchmark(results, instance_folder, mutated_folder, num_keys, value_size, num_connections, address, rate, core):
+  benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}-core{5:d}".format(instance_folder, rate, num_connections, num_keys, value_size, core)
+  shell_call('taskset -c {0:d} {1:s}mutated_memcache -z {2:d} -v {3:d} -n {4:d} -W 10000 {5:s} {6:d} > {7:s}'.format(core, mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
+  with some_rlock:
+    results.append(parse_memcached_benchmark(rate, core, benchmark_file))
 
 def run_memcached_benchmark(args):
   mutated_folder = 'XcontainerBolt/mutated/client/'
   num_keys = 10*1024
   value_size = 200
-  num_connections = args.connections
+  num_connections = args.connections / args.cores
 
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
@@ -267,9 +299,10 @@ def run_memcached_benchmark(args):
   rates = get_rates(args, num_connections)
   results = []
   for rate in rates:
-    benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}".format(instance_folder, rate, num_connections, num_keys, value_size)
-    shell_call('{0:s}mutated_memcache -z {1:d} -v {2:d} -n {3:d} -W 10000 {4:s} {5:d} > {6:s}'.format(mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
-    results.append(parse_memcached_benchmark(rate, benchmark_file))
+    mem_funs = []
+    for i in range(args.cores):
+      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, PROCESSOR + i))
+    run_parallel_instances(mem_funs)
 
   result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
   save_benchmark_results(instance_folder, result_files, results)

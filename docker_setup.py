@@ -16,6 +16,7 @@ DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
 
+
 class myThread (threading.Thread):
   def __init__(self, threadId, name, fun):
     threading.Thread.__init__(self)
@@ -25,6 +26,7 @@ class myThread (threading.Thread):
 
   def run(self):
     self.fun()
+
 
 def run_parallel_instances(fun):
   threads = []
@@ -153,12 +155,9 @@ def parse_nginx_benchmark(file_name):
 
   regex_exps = [AVG_LATENCY, TAIL_LATENCY, THROUGHPUT]
   results = ["N/A"] * 3
-  avg_latency = "N/A"
-  tail_latency = "N/A"
-  throughput = "N/A"
 
   for line in f.readlines():
-    for i in xrange(len(regex_exps)):
+    for i in range(len(regex_exps)):
       m = regex_exps[i].match(line)
       if m is not None:
         results[i] = m.group(1)
@@ -181,7 +180,7 @@ def save_benchmark_results(instance_folder, file_names, results):
   for result in results:
     core = result[0]
     rate = result[1]
-    for i in xrange(len(files)):
+    for i in range(len(files)):
       measurement = str(result[2][i])
       m = NOT_AVAILABLE.match(measurement)
       if m is not None:
@@ -195,16 +194,16 @@ def save_benchmark_results(instance_folder, file_names, results):
           try:
             measurement = float(measurement) * regex[0]
           except Exception:
-	    print("exception")
-	  break
-      
+            print("exception")
+        break
+
       try:
         fmeasurement = float(measurement)
         if measurement == str(fmeasurement):
           files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
         else:
-	  files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
-      except:
+          files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
+      except Exception:
         files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
 
 
@@ -240,7 +239,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
     rate = rate * num_connections
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
     shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
-                .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
+               .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
 
   result_files = ["avg_latency", "tail_latency", "throughput"]
@@ -250,9 +249,12 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
 STATS = re.compile("([0-9]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)")
 BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\)")
 MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
+MUTATED_FOLDER = 'XcontainerBolt/mutated/client/'
+NUM_MEMCACHED_KEYS = 10*1024
+MEMCACHED_VALUE_SIZE = 200
 
 
-def parse_memcached_benchmark(rate, core, file_name):
+def parse_memcached_benchmark(file_name):
   f = open(file_name, "r")
   lines = f.readlines()
 
@@ -274,34 +276,47 @@ def parse_memcached_benchmark(rate, core, file_name):
   m = MISSED_SENDS.match(lines[11].strip())
   missed_sends = m.group(3)
 
-  results = (core, float(throughput), (rate, avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends))
+  results = (float(throughput), avg_rtt, tail_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends)
   return results
 
-some_rlock = threading.RLock()
 
-def memcached_benchmark(results, instance_folder, mutated_folder, num_keys, value_size, num_connections, address, rate, core):
-  benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}-core{5:d}".format(instance_folder, rate, num_connections, num_keys, value_size, core)
-  shell_call('taskset -c {0:d} {1:s}mutated_memcache -z {2:d} -v {3:d} -n {4:d} -W 10000 {5:s} {6:d} > {7:s}'.format(core, mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
-  with some_rlock:
-    results.append(parse_memcached_benchmark(rate, core, benchmark_file))
+def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
+  return "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}-core{5:d}".format(instance_folder, rate, num_connections, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, core)
+
+
+def parse_memcached_results(args, instance_folder, num_connections, cores):
+  rates = get_rates(args, num_connections)
+  throughput_file = open("{0:s}/throughput.csv".format(instance_folder), "w+")
+
+  for rate in rates:
+    throughput = 0.0
+    for core in cores:
+      benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
+      core_results = parse_memcached_benchmark(benchmark_file)
+      throughput += core_results[0]
+    throughput_file.write("{0:f},{1:d}\n".format(throughput, rate))
+
+
+def memcached_benchmark(results, instance_folder, num_connections, address, rate, core):
+  benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
+  command = 'taskset -c {0:d} {1:s}mutated_memcache -z {2:d} -v {3:d} -n {4:d} -W 10000 {5:s} {6:d} > {7:s}'
+  shell_call(command.format(core, MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, num_connections, args.benchmark_address, rate, benchmark_file), True)
+
 
 def run_memcached_benchmark(args):
-  mutated_folder = 'XcontainerBolt/mutated/client/'
-  num_keys = 10*1024
-  value_size = 200
   num_connections = args.connections / args.cores
 
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
-  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(mutated_folder, num_keys, value_size, args.benchmark_address))
+  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
 
   rates = get_rates(args, num_connections)
   results = []
   for rate in rates:
     mem_funs = []
     for i in range(args.cores):
-      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, PROCESSOR + i))
+      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, PROCESSOR + i))
     run_parallel_instances(mem_funs)
 
   result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
@@ -326,6 +341,7 @@ def destroy_container(args):
   else:
     raise "destroy_container: Not implemented"
 
+
 def setup(args):
   if args.container == "docker":
     setup_docker(args)
@@ -336,6 +352,7 @@ def setup(args):
   else:
     raise "setup: Not implemented for container " + args.container
 
+
 def setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip):
   shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip))
   linux_sleep(1)
@@ -343,11 +360,14 @@ def setup_port_forwarding(machine_ip, machine_port, container_ip, container_port
   linux_sleep(1)
   shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port))
   linux_sleep(1)
-  shell_call('iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'.format(machine_ip, machine_port, container_ip, container_port))
+  command = 'iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
+  shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
   linux_sleep(1)
-  shell_call('iptables -t nat -I POSTROUTING -p tcp --dst {0:s} --dport {1:d} -j SNAT --to-source {2:s}'.format(container_ip, container_port, bridge_ip))
+  command = 'iptables -t nat -I POSTROUTING -p tcp --dst {0:s} --dport {1:d} -j SNAT --to-source {2:s}'
+  shell_call(command.format(container_ip, container_port, bridge_ip))
   linux_sleep(1)
-  shell_call('iptables -t nat -I OUTPUT --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'.format(machine_ip, machine_port, container_ip, container_port))
+  command = 'iptables -t nat -I OUTPUT --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
+  shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
   linux_sleep(1)
 
 
@@ -360,6 +380,7 @@ def generate_xcontainer_ip(bridge_ip):
   new_last = (last + 1) % 255
   parts[-1] = str(new_last)
   return ".".join(parts)
+
 
 def setup_xcontainer(args):
   if args.process == "nginx":
@@ -375,20 +396,21 @@ def setup_xcontainer(args):
     raise Exception("setup_xcontainer: not implemented")
 
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
+  bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
   shell_call('docker stop {0:s}'.format(name))
-  path = os.getcwd()
   os.chdir('/root/experiments/native/compute06/docker')
   machine_ip = get_ip_address('em1')
-  bridge_ip = get_ip_address('xenbr0')
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
-  print 'Setup {0:s} X-Container on {1:s}:{1:2}'.format(args.process, machine_ip, machine_port)
-  print 'X-Container will take over this terminal....'
+  print('Setup {0:s} X-Container on {1:s}:{1:2}'.format(args.process, machine_ip, machine_port))
+  print('X-Container will take over this terminal....')
   shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
+
 
 def destroy_xcontainer_container(name):
   shell_call("xl destroy {0:s}".format(name))
   shell_call("docker rm {0:s}".format(name))
+
 
 def destroy_xcontainer(args):
   if args.process == "nginx":
@@ -431,15 +453,19 @@ def install_docker_dependencies():
         shell_call('make')
         os.chdir(path)
 
+
 def destroy_docker_container(name):
   shell_call('docker stop ' + name)
   shell_call('docker rm ' + name)
 
+
 def nginx_docker_port():
   return docker_port(NGINX_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
 
+
 def memcached_docker_port():
   return docker_port(MEMCACHED_CONTAINER_NAME, '([0-9]+)/tcp -> 0.0.0.0:([0-9]+)')
+
 
 def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   configuration_file_path = '/dev/nginx.conf'
@@ -452,7 +478,7 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   cpu = "--cpuset-cpus=1"
   if is_xcontainer:
     cpu = ""
-  if address == None:
+  if address is None:
     shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
@@ -474,14 +500,6 @@ def check_processor(args, name):
   if output != str(PROCESSOR):
     raise Exception("Error. Container is not bound to processor {0:d}".format(PROCESSOR))
 
-def shell_output(command, showCommand=False):
-  if showCommand:
-    print('RUNNING COMMAND: ' + command)
-  output = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()[0]
-  if showCommand:
-    print('')
-  return output
-
 
 def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
@@ -492,11 +510,11 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   if is_xcontainer:
     cpu = ""
 
-  if address == None:
+  if address is None:
     # TODO: Way to pass in memcached parameters like memory size
     shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m 256'
-      .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
-    )
+               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT)
+               )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
     shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
@@ -509,6 +527,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   print("To benchmark run 'python docker_setup.py -c docker -p memcached -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
   return ports
 
+
 def docker_port(name, regex):
   try:
     output = shell_output('docker port {0:s}'.format(name))
@@ -519,6 +538,7 @@ def docker_port(name, regex):
       return list(results[0])
   except subprocess.CalledProcessError as e:
     return None
+
 
 def docker_ip(name, docker_filter):
   print(docker_filter, name)
@@ -531,12 +551,14 @@ def docker_ip(name, docker_filter):
   except subprocess.CalledProcessError as e:
     return None
 
+
 def setup_docker(args):
   install_docker_dependencies()
   if args.process == "nginx":
     create_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
   elif args.process == "memcached":
     setup_docker_memcached_container(args, DOCKER_INSPECT_FILTER)
+
 
 def destroy_docker(args):
   if args.process == "nginx":
@@ -558,10 +580,12 @@ def install_linux_dependencies():
   else:
     install('lxc', packages)
 
+
 def linux_container_execute_command(name, command):
   c = 'lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"'
   print(c)
   shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
+
 
 def get_linux_container_ip(name):
   try:
@@ -573,6 +597,7 @@ def get_linux_container_ip(name):
   except subprocess.CalledProcessError as e:
     return None
 
+
 def setup_linux(args):
   install_linux_dependencies()
   if args.process == "nginx":
@@ -580,7 +605,7 @@ def setup_linux(args):
     container_ip = get_linux_container_ip(name)
     container_port = NGINX_CONTAINER_PORT
     machine_port = NGINX_MACHINE_PORT
-    if container_ip == None:
+    if container_ip is None:
       setup_linux_nginx_container()
   elif args.process == "memcached":
     name = MEMCACHED_CONTAINER_NAME
@@ -588,14 +613,14 @@ def setup_linux(args):
     container_port = MEMCACHED_CONTAINER_PORT
     machine_port = MEMCACHED_MACHINE_PORT
 
-    if container_ip == None:
+    if container_ip is None:
       setup_linux_memcached_container()
   else:
     raise "setup_linux: Not implemented"
 
   container_ip = get_linux_container_ip(name)
   if args.cores > 1:
-	raise "Error need to implement logic for multiple cores"
+    raise Exception("Error need to implement logic for multiple cores")
 
   shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, PROCESSOR))
   check_processor(args, name)
@@ -604,14 +629,17 @@ def setup_linux(args):
   setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip)
   print("To benchmark run 'python docker_setup.py -c linux -p {0:s} -b {1:s}:{2:d}'".format(args.process, machine_ip, machine_port))
 
+
 def start_linux_container(name):
   # TODO: Is this the template we want?
   shell_call('lxc-create --name ' + name + ' -t ubuntu')
   shell_call('lxc-start --name ' + name + ' -d')
 
+
 def linux_sleep(num_seconds):
   print("Sleeping for {0:d} seconds. Linux container network setup is slow....".format(num_seconds))
   time.sleep(num_seconds)
+
 
 def setup_linux_nginx_container():
   start_linux_container(NGINX_CONTAINER_NAME)
@@ -638,6 +666,7 @@ def destroy_linux_container(name):
   shell_call('lxc-stop --name ' + name)
   shell_call('lxc-destroy --name ' + name)
 
+
 def destroy_linux(args):
   if args.process == "nginx":
     destroy_linux_container(NGINX_CONTAINER_NAME)
@@ -647,6 +676,7 @@ def destroy_linux(args):
 #################################################################################################
 # Main
 #################################################################################################
+
 
 if __name__ == '__main__':
   # Example container setup
@@ -668,7 +698,7 @@ if __name__ == '__main__':
   args.connections = 100
   args.threads = 10
 
-  if args.benchmark_address != None:
+  if args.benchmark_address is not None:
     run_benchmarks(args)
   elif args.destroy:
     destroy_container(args)

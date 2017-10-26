@@ -74,7 +74,7 @@ def install(package, known_packages):
   if package in known_packages:
     print(package + " has already been installed")
   else:
-    shell_call('apt-get install -y {:s}'.format(package))
+    shell_call('apt-get install -y {0:s}'.format(package))
 
 
 def install_common_dependencies(packages):
@@ -216,16 +216,9 @@ def save_benchmark_results(instance_folder, file_names, results):
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for result in results:
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
-    core = result[0]
-    rate = result[1]
-    for i in range(len(files)):
-      measurement = str(result[2][i])
-=======
     rate = result[0]
     for i in range(len(files)):
       measurement = str(result[1][i])
->>>>>>> Create constants and fix style
       m = NOT_AVAILABLE.match(measurement)
       if m is not None:
         files[i].write("{0:d},N/A\n".format(rate))
@@ -246,15 +239,9 @@ def save_benchmark_results(instance_folder, file_names, results):
         if measurement == str(fmeasurement):
           files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
         else:
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
           files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
       except Exception:
         files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
-=======
-          files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
-      except Exception:
-        files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
->>>>>>> Create constants and fix style
 
 
 def get_rates(args, num_connections):
@@ -370,17 +357,9 @@ def run_memcached_benchmark(args):
 
   rates = get_rates(args, num_connections)
   results = []
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
   cores = []
   for i in range(args.cores):
     cores.append(PROCESSOR + i)
-=======
-  for rate in rates:
-    benchmark_file = "{0:s}/r{1:d}-c{2:d}-k{3:d}-v{4:d}".format(instance_folder, rate, num_connections, num_keys, value_size)
-    command = '{0:s}mutated_memcache -z {1:d} -v {2:d} -n {3:d} -W 10000 {4:s} {5:d} > {6:s}'
-    shell_call(command.format(mutated_folder, num_keys, value_size, num_connections, args.benchmark_address, rate, benchmark_file), True)
-    results.append(parse_memcached_benchmark(rate, benchmark_file))
->>>>>>> Create constants and fix style
 
   for rate in rates:
     break
@@ -548,12 +527,8 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   if is_xcontainer:
     cpu = ""
   if address is None:
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
     command = 'docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'
     shell_call(command.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
-=======
-    shell_call('docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
->>>>>>> Create constants and fix style
     linux_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   ports = nginx_docker_port()
@@ -591,7 +566,6 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   cpu = "--cpuset-cpus={0:d}".format(PROCESSOR)
   if is_xcontainer:
     cpu = ""
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
@@ -601,11 +575,6 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
     shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
-=======
-  if address is None:
-    command = 'docker run --name {0:s} -P {1:s} -v {2:s}:/etc/memcachedconf:ro -d memcached -m {3:d}'
-    shell_call(command.format(MEMCACHED_CONTAINER_NAME, cpu, configuration_file_path, MEMCACHED_SIZE))
->>>>>>> Create constants and fix style
 
   check_processor(args, MEMCACHED_CONTAINER_NAME)
   ports = memcached_docker_port()
@@ -751,16 +720,12 @@ def setup_linux_memcached_container():
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y memcached')
   container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, '/etc/init.d/memcached stop')
-<<<<<<< 3642ae400677cb7360274e5761d0bedeafc0cca3
-  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} &'
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip))
-
-=======
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo truncate -s0 /etc/memcached.conf")
   for line in get_memcached_configuration().split("\n"):
     linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/memcached.conf".format(line))
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'memcached -m {0:d} -u root -p {1:d} -l {2:s} &'.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip))
->>>>>>> Create constants and fix style
+  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} &'
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip))
+
 
 def destroy_linux_container(name):
   shell_call('lxc-stop --name ' + name)

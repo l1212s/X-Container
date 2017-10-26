@@ -261,8 +261,8 @@ def parse_memcached_benchmark(file_name):
   [throughput, rate] = lines[1].strip().split('\t')
 
   m = STATS.match(lines[4].strip())
-  avg_rtt = m.group(2)
-  tail_rtt = m.group(5)
+  avg_rtt = float(m.group(2))
+  tail_rtt = float(m.group(5))
 
   m = STATS.match(lines[7].strip())
   avg_load_generator_queue = m.group(2)
@@ -286,15 +286,22 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 
 def parse_memcached_results(args, instance_folder, num_connections, cores):
   rates = get_rates(args, num_connections)
-  throughput_file = open("{0:s}/throughput.csv".format(instance_folder), "w+")
+  file_names = ["throughput", "avg_rtt", "tail_rtt"]
+  files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names) 
 
   for rate in rates:
-    throughput = 0.0
+    sums = map(lambda f: 0.0, file_names)
     for core in cores:
       benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
       core_results = parse_memcached_benchmark(benchmark_file)
-      throughput += core_results[0]
-    throughput_file.write("{0:f},{1:d}\n".format(throughput, rate))
+      for i in range(len(sums)):
+	sums[i] += core_results[i]
+    files[0].write("{0:f},{1:d}\n".format(sums[0], rate)) 
+    for i in range(1, len(files)):
+      files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))
+ 
+  for f in files:
+    f.close()   
 
 
 def memcached_benchmark(results, instance_folder, num_connections, address, rate, core):
@@ -309,22 +316,28 @@ def run_memcached_benchmark(args):
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
-  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
+  #shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
 
   rates = get_rates(args, num_connections)
   results = []
+  cores = []
+  for i in range(args.cores):
+    cores.append(PROCESSOR + i)
+
   for rate in rates:
+    break
     mem_funs = []
     for i in range(args.cores):
       mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, PROCESSOR + i))
     run_parallel_instances(mem_funs)
+  parse_memcached_results(args, instance_folder, num_connections, cores)
 
-  result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
-  save_benchmark_results(instance_folder, result_files, results)
+  #result_files = ["throughput", "avg_rtt", "tail_rtt", "avg_load_generator", "tail_load_generator", "receive", "transmit", "missed_sends"]
+  #save_benchmark_results(instance_folder, result_files, results)
 
 
 def run_benchmarks(args):
-  install_benchmark_dependencies(args)
+  #install_benchmark_dependencies(args)
   if args.process == "nginx":
     run_nginx_benchmark(args, args.connections, args.threads, args.duration)
   elif args.process == "memcached":

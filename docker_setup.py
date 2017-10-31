@@ -10,8 +10,8 @@ NGINX_CONTAINER_NAME = "nginx_container"
 NGINX_MACHINE_PORT = 80
 NGINX_CONTAINER_PORT = 80
 MEMCACHED_CONTAINER_NAME = "memcached_container"
-MEMCACHED_MACHINE_PORT = 11101
-MEMCACHED_CONTAINER_PORT = 11212
+MEMCACHED_MACHINE_PORT = 11211
+MEMCACHED_CONTAINER_PORT = 11211
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
@@ -402,25 +402,28 @@ def setup(args):
 
 def setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip):
   shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip))
-  linux_sleep(1)
+  container_sleep(1)
   shell_call('iptables -I FORWARD -p tcp -s {0:s} -j ACCEPT'.format(container_ip))
-  linux_sleep(1)
+  container_sleep(1)
   shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port))
-  linux_sleep(1)
+  container_sleep(1)
   command = 'iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
   shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
-  linux_sleep(1)
+  container_sleep(1)
   command = 'iptables -t nat -I POSTROUTING -p tcp --dst {0:s} --dport {1:d} -j SNAT --to-source {2:s}'
   shell_call(command.format(container_ip, container_port, bridge_ip))
-  linux_sleep(1)
+  container_sleep(1)
   command = 'iptables -t nat -I OUTPUT --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
   shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
-  linux_sleep(1)
+  container_sleep(1)
 
 
 #################################################################################################
 # X-container specific specific
 #################################################################################################
+
+# sudo docker run --name memcached_container -p 0.0.0.0:11211:11211 -d memcached -m 512 -u root
+
 def generate_xcontainer_ip(bridge_ip):
   parts = bridge_ip.split(".")
   last = int(parts[-1])
@@ -439,25 +442,33 @@ def setup_xcontainer(args):
     name = MEMCACHED_CONTAINER_NAME
     container_port = MEMCACHED_CONTAINER_PORT
     machine_port = MEMCACHED_MACHINE_PORT
+    setup_docker_memcached_container(args, XCONTAINER_INSPECT_FILTER, True)
   else:
     raise Exception("setup_xcontainer: not implemented")
 
-  bridge_ip = get_ip_address('xenbr0')
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
   bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
   shell_call('docker stop {0:s}'.format(name))
-  os.chdir('/root/experiments/native/compute06/docker')
   machine_ip = get_ip_address('em1')
+  shell_call('tmux new -s xcontainer -d')
+  if args.cores > 1:
+    raise Exception("xcontainer: multi-core not implemented")
+  shell_call('tmux send -t xcontainer "cd /root/experiments/native/compute06/docker" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
+  print('tmux send -t xcontainer "python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
+  shell_call('tmux send -t xcontainer "python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
+  container_sleep(5)
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
-  print('Setup {0:s} X-Container on {1:s}:{1:2}'.format(args.process, machine_ip, machine_port))
-  print('X-Container will take over this terminal....')
-  shell_call('python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
+  print('Setup {0:s} X-Container on {1:s}:{2:d}'.format(args.process, machine_ip, machine_port))
+  shell_call('xl vcpu-pin memcached_container 0 {0:d}'.format(PROCESSOR))
+  shell_call('python /root/x-container/irq-balance.py')
+  shell_call('python /root/x-container/cpu-balance.py')
 
 
 def destroy_xcontainer_container(name):
   shell_call("xl destroy {0:s}".format(name))
   shell_call("docker rm {0:s}".format(name))
+  shell_call("tmux kill-session -t xcontainer")
 
 
 def destroy_xcontainer(args):
@@ -528,11 +539,15 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
     cpu = ""
   if address is None:
     command = 'docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'
+    print(command)
     shell_call(command.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
-    linux_sleep(5)
+    container_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   ports = nginx_docker_port()
-  machine_ip = get_ip_address('eno1')
+  if is_xcontainer:
+    machine_ip = get_ip_address('em1')
+  else:
+    machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
   setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
   print("To benchmark run 'python docker_setup.py -c docker -p nginx -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
@@ -549,7 +564,7 @@ def check_processor(args, name):
   elif args.container == "linux":
     output = shell_output("lxc-cgroup -n {0:s} cpuset.cpus".format(name)).strip()
   else:
-    raise Exception("check_processor: Not implemented")
+    return
   print(output)
   if output != str(PROCESSOR):
     raise Exception("Error. Container is not bound to processor {0:d}".format(PROCESSOR))
@@ -569,7 +584,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d}'
+    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d} -u root'
                .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE)
                )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
@@ -578,10 +593,18 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   check_processor(args, MEMCACHED_CONTAINER_NAME)
   ports = memcached_docker_port()
-  machine_ip = get_ip_address('eno1')
+  print(ports)
+  if is_xcontainer:
+    container = "xcontainer"
+    machine_ip = get_ip_address('em1')
+  else:
+    container = "docker"
+    machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
   setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
-  print("To benchmark run 'python docker_setup.py -c docker -p memcached -b {0:s}:{1:s}'".format(machine_ip, ports[1]))
+
+  if not is_xcontainer:
+    print("To benchmark run 'python docker_setup.py -c {0:s} -p memcached -b {1:s}:{2:s}'".format(container, machine_ip, ports[1]))
   return ports
 
 
@@ -695,14 +718,14 @@ def start_linux_container(name):
   shell_call('lxc-start --name ' + name + ' -d')
 
 
-def linux_sleep(num_seconds):
-  print("Sleeping for {0:d} seconds. Linux container network setup is slow....".format(num_seconds))
+def container_sleep(num_seconds):
+  print("Sleeping for {0:d} seconds. Container network setup is slow....".format(num_seconds))
   time.sleep(num_seconds)
 
 
 def setup_linux_nginx_container():
   start_linux_container(NGINX_CONTAINER_NAME)
-  linux_sleep(5)
+  container_sleep(5)
   linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get update')
   linux_container_execute_command(NGINX_CONTAINER_NAME, 'sudo apt-get install -y nginx')
 #  linux_container_execute_command(NGINX_CONTAINER_NAME, 'systemctl status nginx')
@@ -715,7 +738,7 @@ def setup_linux_nginx_container():
 
 def setup_linux_memcached_container():
   start_linux_container(MEMCACHED_CONTAINER_NAME)
-  linux_sleep(5)
+  container_sleep(5)
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get update')
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, 'sudo apt-get install -y memcached')
   container_ip = get_linux_container_ip(MEMCACHED_CONTAINER_NAME)

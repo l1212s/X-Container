@@ -89,7 +89,7 @@ def create_readme(args, folder):
   f.write("NUM CLIENTS: {0:d}\n".format(args.cores))
   f.write("DURATION: {0:d}\n".format(args.duration))
   f.write("CONNECTIONS: {0:d}\n".format(args.connections))
-  f.write("NUM CONNECTIONS PER CLIENT: {0:d}\n", num_connections)
+  f.write("NUM CONNECTIONS PER CLIENT: {0:d}\n".format(num_connections))
   f.write("RATES: {0:s}\n".format(str(rates)))
   f.write("THREADS: {0:d}\n".format(args.threads))
   f.write("DATE: {0:s}\n".format(args.date))

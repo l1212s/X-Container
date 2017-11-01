@@ -828,7 +828,7 @@ if __name__ == '__main__':
   check_git()
 
   if args.benchmark_address is not None:
-    check_last_run()
+    check_last_run(args)
     run_benchmarks(args)
   elif args.destroy:
     destroy_container(args)

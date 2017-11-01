@@ -410,7 +410,7 @@ def run_memcached_benchmark(args):
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
   shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
-  rates = get_rates(args, num_connections)
+  rates = get_rates(args)
   results = []
   cores = []
   for i in range(args.cores):

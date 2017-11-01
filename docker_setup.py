@@ -56,7 +56,7 @@ def container_folder(args):
   return "benchmark/{0:s}-{1:s}".format(args.process, args.container)
 
 
-def create_benchmark_folder(args)
+def create_benchmark_folder(args):
   folder = container_folder(args)
   shell_call("mkdir {0:s}".format(folder))
   instance_folder = "{0:s}/{1:s}".format(folder, args.date)

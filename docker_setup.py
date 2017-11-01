@@ -79,14 +79,18 @@ def check_last_run(args):
 
 def create_readme(args, folder):
   last_commit = shell_output("git log --oneline -n 1")
+  num_connections = get_num_connections(args)
+  rates = get_rates(args)
   f = open("{0:s}/README".format(folder), 'w+')
   f.write("LAST COMMIT: {0:s}\n".format(last_commit))
   f.write("CONTAINER: {0:s}\n".format(args.container))
   f.write("PROCESS: {0:s}\n".format(args.process))
   f.write("BENCHMARK ADDRESS: {0:s}\n".format(args.benchmark_address))
-  f.write("CORES: {0:d}\n".format(args.cores))
+  f.write("NUM CLIENTS: {0:d}\n".format(args.cores))
   f.write("DURATION: {0:d}\n".format(args.duration))
   f.write("CONNECTIONS: {0:d}\n".format(args.connections))
+  f.write("NUM CONNECTIONS PER CLIENT: {0:d}\n", num_connections)
+  f.write("RATES: {0:s}\n".format(str(rates)))
   f.write("THREADS: {0:d}\n".format(args.threads))
   f.write("DATE: {0:s}\n".format(args.date))
   f.close()
@@ -292,15 +296,25 @@ def save_benchmark_results(instance_folder, file_names, results):
         files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
 
 
-def get_rates(args, num_connections):
+def get_rates(args):
+  num_connections = get_num_connections(args)
+  def r(x,y): return range(x * num_connections, y * num_connections, x * num_connections)
   if args.process == "nginx":
-    rates = range(5, 500, 5)
+    rates = r(5, 500)
   elif args.process == "memcached":
-    rates = range(100 * num_connections, 2500 * num_connections, 100 * num_connections)
+    rates = r(200, 4000)
   else:
     raise "get_rates: not implemented"
   return rates
 
+
+def get_num_connections(args):
+  if args.process == "nginx":
+    return args.connections
+  elif args.process == "memcached":
+    return args.connections / args.cores
+  else:
+    raise Exception("get_num_connections: Not implemented")
 
 def get_date():
   return shell_output('date +%F-%H-%M-%S').strip()
@@ -311,10 +325,9 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   create_readme(args, instance_folder)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
-  rates = get_rates(args, num_connections)
+  rates = get_rates(args)
   results = []
   for rate in rates:
-    rate = rate * num_connections
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
     shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
                .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
@@ -364,7 +377,7 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 
 
 def parse_memcached_results(args, instance_folder, num_connections, cores):
-  rates = get_rates(args, num_connections)
+  rates = get_rates(args)
   file_names = ["throughput", "avg_rtt", "tail_rtt"]
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
@@ -390,7 +403,7 @@ def memcached_benchmark(results, instance_folder, num_connections, address, rate
 
 
 def run_memcached_benchmark(args):
-  num_connections = args.connections / args.cores
+  num_connections = get_num_connections(args)
 
   instance_folder = create_benchmark_folder(args)
   create_readme(args, instance_folder)

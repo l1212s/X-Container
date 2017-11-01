@@ -54,7 +54,7 @@ def check_git():
 
 def create_readme(args, folder):
   last_commit = shell_output("git log --oneline -n 1")
-  f = open("{0:s}/README".format(folder))
+  f = open("{0:s}/README".format(folder), 'w+')
   f.write("LAST COMMIT: {0:s}\n".format(last_commit))
   f.write("CONTAINER: {0:s}\n".format(args.container))
   f.write("PROCESS: {0:s}\n".format(args.process))

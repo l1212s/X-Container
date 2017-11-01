@@ -52,6 +52,31 @@ def check_git():
     raise Exception("Commit your code before you run this script!")
 
 
+def container_folder(args):
+  return "benchmark/{0:s}-{1:s}".format(args.process, args.container)
+
+
+def create_benchmark_folder(args)
+  folder = container_folder(args)
+  shell_call("mkdir {0:s}".format(folder))
+  instance_folder = "{0:s}/{1:s}".format(folder, args.date)
+  shell_call("mkdir {0:1}".format(instance_folder))
+  return instance_folder
+
+
+def check_last_run(args):
+  folder = container_folder(args)
+  output = shell_output("ls {0:s}/2017-*".format(folder)).strip().split("\n")
+  if len(output) == 0:
+    return
+
+  output.sort()
+  last = output[-1]
+  filename = "{0:s}/{1:s}/README".format(folder, last)
+  if not "NOTE: " in open(filename).read():
+    raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
+
+
 def create_readme(args, folder):
   last_commit = shell_output("git log --oneline -n 1")
   f = open("{0:s}/README".format(folder), 'w+')
@@ -281,16 +306,8 @@ def get_date():
   return shell_output('date +%F-%H-%M-%S').strip()
 
 
-def create_benchmark_folder(date, process, container):
-  nginx_folder = "benchmark/{0:s}-{1:s}".format(process, container)
-  shell_call("mkdir {0:s}".format(nginx_folder))
-  instance_folder = "{0:s}/{1:s}".format(nginx_folder, date)
-  shell_call("mkdir {0:1}".format(instance_folder))
-  return instance_folder
-
-
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
-  instance_folder = create_benchmark_folder(args.date, args.process, args.container)
+  instance_folder = create_benchmark_folder(args)
   create_readme(args, instance_folder)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
@@ -375,7 +392,7 @@ def memcached_benchmark(results, instance_folder, num_connections, address, rate
 def run_memcached_benchmark(args):
   num_connections = args.connections / args.cores
 
-  instance_folder = create_benchmark_folder(args.date, args.process, args.container)
+  instance_folder = create_benchmark_folder(args)
   create_readme(args, instance_folder)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
@@ -811,6 +828,7 @@ if __name__ == '__main__':
   check_git()
 
   if args.benchmark_address is not None:
+    check_last_run()
     run_benchmarks(args)
   elif args.destroy:
     destroy_container(args)

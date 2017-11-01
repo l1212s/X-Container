@@ -66,7 +66,7 @@ def create_benchmark_folder(args):
 
 def check_last_run(args):
   folder = container_folder(args)
-  output = shell_output("ls {0:s}/2017-*".format(folder)).strip().split("\n")
+  output = shell_output("ls {0:s}".format(folder)).strip().split("\n")
   if len(output) == 0:
     return
 

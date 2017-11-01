@@ -17,6 +17,9 @@ XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
 MEMCACHED_SIZE = 512
 
+#################################################################################################
+# Common functionality
+#################################################################################################
 
 class myThread (threading.Thread):
   def __init__(self, threadId, name, fun):
@@ -39,9 +42,29 @@ def run_parallel_instances(fun):
   for t in threads:
     t.join()
 
-#################################################################################################
-# Common functionality
-#################################################################################################
+
+def check_git():
+  output = shell_output("git status --untracked-files=no").split("\n")
+  # Clean state should look like
+  # # On branch master
+  # nothing to commit (use -u to show untracked files) 
+  if len(output) > 2:
+    raise Exception("Commit your code before you run this script!")
+
+
+def create_readme(args, folder):
+  last_commit = shell_output("git log --oneline -n 1")
+  f = open("{0:s}/README".format(folder))
+  f.write("LAST COMMIT: {0:s}\n".format(last_commit))
+  f.write("CONTAINER: {0:s}\n".format(args.container))
+  f.write("PROCESS: {0:s}\n".format(args.process))
+  f.write("BENCHMARK ADDRESS: {0:s}\n".format(args.benchmark_address))
+  f.write("CORES: {0:d}\n".format(args.cores))
+  f.write("DURATION: {0:d}\n".format(args.duration))
+  f.write("CONNECTIONS: {0:d}\n".format(args.connections))
+  f.write("THREADS: {0:d}\n".format(args.threads))
+  f.write("DATE: {0:s}\n".format(args.date))
+  f.close()
 
 
 def shell_call(command, showCommand=False):
@@ -248,7 +271,7 @@ def get_rates(args, num_connections):
   if args.process == "nginx":
     rates = range(5, 500, 5)
   elif args.process == "memcached":
-    rates = range(10000, 200000, 10000)
+    rates = range(100 * num_connections, 2500 * num_connections, 100 * num_connections)
   else:
     raise "get_rates: not implemented"
   return rates
@@ -268,6 +291,7 @@ def create_benchmark_folder(date, process, container):
 
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
+  create_readme(args, instance_folder)
   print("Putting NGINX benchmarks in {0:s}".format(instance_folder))
 
   rates = get_rates(args, num_connections)
@@ -278,6 +302,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
     shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
                .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
+    print(results[-1])
 
   result_files = ["avg_latency", "tail_latency", "throughput"]
   save_benchmark_results(instance_folder, result_files, results)
@@ -333,7 +358,7 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
       core_results = parse_memcached_benchmark(benchmark_file)
       for i in range(len(sums)):
         sums[i] += core_results[i]
-    files[0].write("{0:f},{1:d}\n".format(sums[0], rate))
+    files[0].write("{0:f},{1:d}\n".format(sums[0], len(cores) * rate)) 
     for i in range(1, len(files)):
       files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))
 
@@ -351,27 +376,26 @@ def run_memcached_benchmark(args):
   num_connections = args.connections / args.cores
 
   instance_folder = create_benchmark_folder(args.date, args.process, args.container)
+  create_readme(args, instance_folder)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
   shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
-
   rates = get_rates(args, num_connections)
   results = []
   cores = []
   for i in range(args.cores):
-    cores.append(PROCESSOR + i)
+    cores.append(PROCESSOR + 2*i)
 
   for rate in rates:
-    break
     mem_funs = []
     for i in range(args.cores):
-      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, PROCESSOR + i))
+      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, cores[i]))
     run_parallel_instances(mem_funs)
   parse_memcached_results(args, instance_folder, num_connections, cores)
 
 
 def run_benchmarks(args):
-  install_benchmark_dependencies(args)
+  #  install_benchmark_dependencies(args)
   if args.process == "nginx":
     run_nginx_benchmark(args, args.connections, args.threads, args.duration)
   elif args.process == "memcached":
@@ -783,8 +807,10 @@ if __name__ == '__main__':
   parser.add_argument('--threads', type=int, default=1, help='Number of threads')
   parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
   args = parser.parse_args()
-  args.connections = 100
+  args.connections = 50
   args.threads = 10
+
+  check_git()
 
   if args.benchmark_address is not None:
     run_benchmarks(args)

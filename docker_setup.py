@@ -803,12 +803,10 @@ if __name__ == '__main__':
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   parser.add_argument('--cores', type=int, default=1, help='Number of cores')
   parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
-  parser.add_argument('--connections', type=int, default=1, help='Number of client connections')
-  parser.add_argument('--threads', type=int, default=1, help='Number of threads')
+  parser.add_argument('--connections', type=int, default=100, help='Number of client connections')
+  parser.add_argument('--threads', type=int, default=10, help='Number of threads')
   parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
   args = parser.parse_args()
-  args.connections = 50
-  args.threads = 10
 
   check_git()
 

@@ -657,10 +657,10 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
     container = "docker"
     machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('docker0')
-  setup_port_forwarding(machine_ip, int(ports[1]), address, int(ports[0]), bridge_ip)
+  setup_port_forwarding(machine_ip, MEMCACHED_MACHINE_PORT, address, int(ports[0]), bridge_ip)
 
   if not is_xcontainer:
-    print("To benchmark run 'python docker_setup.py -c {0:s} -p memcached -b {1:s}:{2:s}'".format(container, machine_ip, ports[1]))
+    print("To benchmark run 'python docker_setup.py -c {0:s} -p memcached -b {1:s}:{2:s}'".format(container, machine_ip, MEMCACHED_MACHINE_PORT))
   return ports
 
 

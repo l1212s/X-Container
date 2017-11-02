@@ -16,6 +16,7 @@ DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 PROCESSOR = 19
 MEMCACHED_SIZE = 512
+MEMCACHED_THREADS = 4
 
 #################################################################################################
 # Common functionality
@@ -47,7 +48,7 @@ def check_git():
   output = shell_output("git status --untracked-files=no").strip().split("\n")
   # Clean state should look like
   # # On branch master
-  # nothing to commit (use -u to show untracked files) 
+  # nothing to commit (use -u to show untracked files)
   if len(output) > 2:
     raise Exception("Commit your code before you run this script!")
 
@@ -388,7 +389,7 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
       core_results = parse_memcached_benchmark(benchmark_file)
       for i in range(len(sums)):
         sums[i] += core_results[i]
-    files[0].write("{0:f},{1:d}\n".format(sums[0], len(cores) * rate)) 
+    files[0].write("{0:f},{1:d}\n".format(sums[0], len(cores) * rate))
     for i in range(1, len(files)):
       files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))
 
@@ -638,8 +639,8 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d} -u root -t 4'
-               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE)
+    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d} -u root -t {5:d}'
+               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE, MEMCACHED_THREADS)
                )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
@@ -800,8 +801,8 @@ def setup_linux_memcached_container():
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo truncate -s0 /etc/memcached.conf")
   for line in get_memcached_configuration().split("\n"):
     linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/memcached.conf".format(line))
-  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} &'
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip))
+  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d}'
+  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
 
 
 def destroy_linux_container(name):

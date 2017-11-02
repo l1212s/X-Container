@@ -412,18 +412,21 @@ def run_memcached_benchmark(args):
   create_readme(args, instance_folder)
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
-  shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
+  if not args.dry_run:
+    shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
+
   rates = get_rates(args)
   results = []
   cores = []
   for i in range(args.cores):
     cores.append(PROCESSOR + 2*i)
 
-  for rate in rates:
-    mem_funs = []
-    for i in range(args.cores):
-      mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, cores[i]))
-    run_parallel_instances(mem_funs)
+  if not args.dry_run:
+    for rate in rates:
+      mem_funs = []
+      for i in range(args.cores):
+        mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, cores[i]))
+      run_parallel_instances(mem_funs)
   parse_memcached_results(args, instance_folder, num_connections, cores)
 
 
@@ -839,12 +842,14 @@ if __name__ == '__main__':
   parser.add_argument('--connections', type=int, default=100, help='Number of client connections')
   parser.add_argument('--threads', type=int, default=10, help='Number of threads')
   parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
+  parser.add_argument('--dry_run', type=bool, default=False, help="Don't actually run the benchmark. Still parsing output")
   args = parser.parse_args()
 
   check_git()
 
   if args.benchmark_address is not None:
-    check_last_run(args)
+    if not args.dry_run:
+      check_last_run(args)
     run_benchmarks(args)
   elif args.destroy:
     destroy_container(args)

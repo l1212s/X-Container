@@ -168,6 +168,10 @@ http {
 '''
 
 
+def tmux_command(session, command):
+  shell_call('tmux send -t {0:s} "{1:s}" C-m'.format(session, command))
+
+
 def get_memcached_configuration():
   return '''
 # Run memcached as a daemon. This command is implied, and is not needed for the
@@ -267,6 +271,7 @@ NOT_AVAILABLE = re.compile("N/A")
 
 
 def save_benchmark_results(instance_folder, file_names, results):
+  raise Exception("omg out of date")
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for result in results:
@@ -288,19 +293,19 @@ def save_benchmark_results(instance_folder, file_names, results):
             print("exception")
         break
 
-      try:
-        fmeasurement = float(measurement)
-        if measurement == str(fmeasurement):
-          files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
-        else:
-          files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
-      except Exception:
-        files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
+#      try:
+#        fmeasurement = float(measurement)
+#        if measurement == str(fmeasurement):
+#          files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
+#        else:
+#          files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
+#      except Exception:
+#        files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
 
 
 def get_rates(args):
   num_connections = get_num_connections(args)
-  def r(x,y): return range(x * num_connections, y * num_connections, x * num_connections)
+  def r(x, y): return range(x * num_connections, y * num_connections, x * num_connections)
   if args.process == "nginx":
     rates = r(5, 500)
   elif args.process == "memcached":
@@ -317,6 +322,7 @@ def get_num_connections(args):
     return args.connections / args.cores
   else:
     raise Exception("get_num_connections: Not implemented")
+
 
 def get_date():
   return shell_output('date +%F-%H-%M-%S').strip()
@@ -514,9 +520,8 @@ def setup_xcontainer(args):
   shell_call('tmux new -s xcontainer -d')
   if args.cores > 1:
     raise Exception("xcontainer: multi-core not implemented")
-  shell_call('tmux send -t xcontainer "cd /root/experiments/native/compute06/docker" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
-  print('tmux send -t xcontainer "python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
-  shell_call('tmux send -t xcontainer "python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}" C-m'.format(docker_id, xcontainer_ip, name, args.cores))
+  tmux_command('xcontainer', 'cd /root/experiments/native/compute06/docker')
+  tmux_command('xcontainer', 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
   container_sleep(5)
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
   print('Setup {0:s} X-Container on {1:s}:{2:d}'.format(args.process, machine_ip, machine_port))
@@ -806,8 +811,9 @@ def setup_linux_memcached_container():
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo truncate -s0 /etc/memcached.conf")
   for line in get_memcached_configuration().split("\n"):
     linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/memcached.conf".format(line))
-  command = 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d}'
-  linux_container_execute_command(MEMCACHED_CONTAINER_NAME, command.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
+  shell_call('tmux new -s linux -d')
+  tmux_command('linux', 'sudo lxc-attach -n {0:s}'.format(MEMCACHED_CONTAINER_NAME))
+  tmux_command('linux', 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d}'.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
 
 
 def destroy_linux_container(name):
@@ -820,6 +826,7 @@ def destroy_linux(args):
     destroy_linux_container(NGINX_CONTAINER_NAME)
   elif args.process == "memcached":
     destroy_linux_container(MEMCACHED_CONTAINER_NAME)
+    shell_call('tmux kill-session -t linux')
 
 #################################################################################################
 # Main

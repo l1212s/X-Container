@@ -47,9 +47,10 @@ def run_parallel_instances(fun):
 def check_git():
   output = shell_output("git status --untracked-files=no").strip().split("\n")
   # Clean state should look like
-  # # On branch master
+  # On branch master
+  # Your branch is up-to-date with 'origin/master'
   # nothing to commit (use -u to show untracked files)
-  if len(output) > 2:
+  if len(output) > 3:
     raise Exception("Commit your code before you run this script!")
 
 

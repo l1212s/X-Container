@@ -813,7 +813,8 @@ def setup_linux_memcached_container():
     linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/memcached.conf".format(line))
   shell_call('tmux new -s linux -d')
   tmux_command('linux', 'sudo lxc-attach -n {0:s}'.format(MEMCACHED_CONTAINER_NAME))
-  tmux_command('linux', 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d}'.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
+  container_sleep(5)
+  tmux_command('linux', 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d} &'.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
 
 
 def destroy_linux_container(name):

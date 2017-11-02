@@ -842,7 +842,7 @@ if __name__ == '__main__':
   parser.add_argument('--connections', type=int, default=100, help='Number of client connections')
   parser.add_argument('--threads', type=int, default=10, help='Number of threads')
   parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
-  parser.add_argument('--dry_run', type=bool, default=False, help="Don't actually run the benchmark. Still parsing output")
+  parser.add_argument('--dry_run', action='store_true', default=False, help="Don't actually run the benchmark. Still parsing output")
   args = parser.parse_args()
 
   check_git()

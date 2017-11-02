@@ -22,6 +22,7 @@ MEMCACHED_THREADS = 4
 # Common functionality
 #################################################################################################
 
+
 class myThread (threading.Thread):
   def __init__(self, threadId, name, fun):
     threading.Thread.__init__(self)
@@ -75,7 +76,7 @@ def check_last_run(args):
   output.sort()
   last = output[-1]
   filename = "{0:s}/{1:s}/README".format(folder, last)
-  if not "NOTE: " in open(filename).read():
+  if "NOTE: " not in open(filename).read():
     raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
 
 
@@ -95,6 +96,10 @@ def create_readme(args, folder):
   f.write("RATES: {0:s}\n".format(str(rates)))
   f.write("THREADS: {0:d}\n".format(args.threads))
   f.write("DATE: {0:s}\n".format(args.date))
+  f.write("BOUND TO PROCESSOR: {0:d}\n".format(PROCESSOR))
+  if args.process == "memcached":
+    f.write("MEMCACHED SIZE(-m): {0:d}\n".format(MEMCACHED_SIZE))
+    f.write("MEMCACHED THREADS(-t): {0:d}\n".format(MEMCACHED_THREADS))
   f.close()
 
 
@@ -305,6 +310,7 @@ def save_benchmark_results(instance_folder, file_names, results):
 
 def get_rates(args):
   num_connections = get_num_connections(args)
+
   def r(x, y): return range(x * num_connections, y * num_connections, x * num_connections)
   if args.process == "nginx":
     rates = r(5, 500)

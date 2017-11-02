@@ -46,6 +46,7 @@ def run_parallel_instances(fun):
 
 
 def check_git():
+  shell_call('git remote update')
   output = shell_output("git status --untracked-files=no").strip().split("\n")
   # Clean state should look like
   # On branch master

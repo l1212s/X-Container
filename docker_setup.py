@@ -525,8 +525,6 @@ def setup_xcontainer(args):
   shell_call('docker stop {0:s}'.format(name))
   machine_ip = get_ip_address('em1')
   shell_call('tmux new -s xcontainer -d')
-  if args.cores > 1:
-    raise Exception("xcontainer: multi-core not implemented")
   tmux_command('xcontainer', 'cd /root/experiments/native/compute06/docker')
   tmux_command('xcontainer', 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
   container_sleep(5)

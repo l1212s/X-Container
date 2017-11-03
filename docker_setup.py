@@ -99,7 +99,7 @@ def create_readme(args, folder):
   f.write("DATE: {0:s}\n".format(args.date))
   f.write("BOUND TO PROCESSOR: {0:d}\n".format(PROCESSOR))
   if args.process == "memcached":
-    f.write("MEMCACHED SIZE(-m): {0:d}\n".format(MEMCACHED_SIZE))
+    f.write("MEMCACHED SIZE(-m): {0:d}M\n".format(MEMCACHED_SIZE))
     f.write("MEMCACHED THREADS(-t): {0:d}\n".format(MEMCACHED_THREADS))
   f.close()
 
@@ -654,7 +654,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d} -u root -t {5:d}'
+    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached -m {4:d}M -u root -t {5:d}'
                .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE, MEMCACHED_THREADS)
                )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)

@@ -648,7 +648,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   setup_memcached_configuration(configuration_file_path)
 
   address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
-  if args.cores > 1 && not is_xcontainer:
+  if args.cores > 1 and not is_xcontainer:
     raise "multi-core not implemented"
   cpu = "--cpuset-cpus={0:d}".format(PROCESSOR)
   if is_xcontainer:

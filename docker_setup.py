@@ -316,7 +316,7 @@ def get_rates(args):
   if args.process == "nginx":
     rates = r(5, 500)
   elif args.process == "memcached":
-    rates = r(100, 4000)
+    rates = r(150, 4200)
   else:
     raise "get_rates: not implemented"
   return rates

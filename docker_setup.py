@@ -708,6 +708,7 @@ def docker_ip(name, docker_filter):
 
 def setup_docker(args):
   install_docker_dependencies()
+  destroy_docker(args)
   if args.process == "nginx":
     create_docker_nginx_container(args, DOCKER_INSPECT_FILTER)
   elif args.process == "memcached":

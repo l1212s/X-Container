@@ -6,16 +6,19 @@ import util
 
 CONTAINERS = ['linux', 'docker', 'xcontainer']
 
-def metric_values(name, xaxis, yaxis):
+def metric_values(name, xaxis, yaxis, mode):
   return {
+    'mode': mode,
     'name': name,
     'x-axis': xaxis,
     'y-axis': yaxis,
   }
 
 METRIC_MAP = {
-  'throughput': metric_values('Throughput', 'Requests Per Second', 'Throughput'),
-  'avg_latency': metric_values('Average Latency', 'Throughput', 'Average Latency (usecs)'),
+  'throughput': metric_values('Throughput', 'Requests Per Second', 'Throughput', 'lines+markers'),
+  'avg_latency': metric_values('Average Latency', 'Throughput', 'Average Latency (usecs)', 'markers'),
+  'tail_latency': metric_values('Tail Latency', 'Throughput', 'Tail Latency (usecs)', 'markers'),
+  'missed_sends': metric_values('Missed Sends', 'Requests Per Second', 'Missed Sends (%)', 'lines+markers'),
 }
 
 def title(name, process, instances):
@@ -48,18 +51,24 @@ def create_graph(args):
     date = getattr(args, container)
     folder = util.instance_folder(util.container_folder(args.process, container), date)
     f = open('{0:s}/{1:s}.csv'.format(folder, args.metric))
-    xs = []
-    ys = []
+    points = []
     for line in f.readlines():
       line = line.strip()
       [x,y] = line.split(',')
-      xs.append(x)
-      ys.append(y)
+      points.append((x,y))
+
+    points = sorted(points, key=lambda point: point[0])
+
+    xs = map(lambda p: p[0], points)
+    ys = map(lambda p: p[1], points)
+    print(container)
+    print(xs)
+    print(ys)
 
     trace = go.Scatter(
       x = xs,
       y = ys,
-      mode = 'lines+markers',
+      mode = mm['mode'],
       name = '{0:s} ({1:s})'.format(container, date)
     )
     data.append(trace)

@@ -58,7 +58,7 @@ def check_git():
 
 
 def create_benchmark_folder(args):
-  container_folder = util.container_folder(args)
+  container_folder = util.container_folder(args.process, args.container)
   shell_call("mkdir {0:s}".format(container_folder))
   instance_folder = util.instance_folder(container_folder, args.date)
   shell_call("mkdir {0:1}".format(instance_folder))

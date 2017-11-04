@@ -47,7 +47,7 @@ def run_parallel_instances(fun):
 
 
 def check_git():
-  shell_call('git remote update')
+  util.shell_call('git remote update')
   output = shell_output("git status --untracked-files=no").strip().split("\n")
   # Clean state should look like
   # On branch master
@@ -59,9 +59,9 @@ def check_git():
 
 def create_benchmark_folder(args):
   container_folder = util.container_folder(args.process, args.container)
-  shell_call("mkdir {0:s}".format(container_folder))
+  util.shell_call("mkdir {0:s}".format(container_folder))
   instance_folder = util.instance_folder(container_folder, args.date)
-  shell_call("mkdir {0:1}".format(instance_folder))
+  util.shell_call("mkdir {0:1}".format(instance_folder))
   return instance_folder
 
 
@@ -101,15 +101,6 @@ def create_readme(args, folder):
   f.close()
 
 
-def shell_call(command, showCommand=False):
-  if showCommand:
-    print('RUNNING COMMAND: ' + command)
-  p = subprocess.Popen(command, shell=True)
-  p.wait()
-  if showCommand:
-    print('')
-
-
 def shell_output(command, showCommand=False):
   if showCommand:
     print('RUNNING COMMAND: ' + command)
@@ -131,11 +122,11 @@ def install(package, known_packages):
   if package in known_packages:
     print(package + " has already been installed")
   else:
-    shell_call('apt-get install -y {0:s}'.format(package))
+    util.shell_call('apt-get install -y {0:s}'.format(package))
 
 
 def install_common_dependencies(packages):
-  shell_call('apt-get update')
+  util.shell_call('apt-get update')
   install('linux-tools-4.4.0-92-generic', packages)
   install('make', packages)
   install('gcc', packages)
@@ -172,7 +163,7 @@ http {
 
 
 def tmux_command(session, command):
-  shell_call('tmux send -t {0:s} "{1:s}" C-m'.format(session, command))
+  util.shell_call('tmux send -t {0:s} "{1:s}" C-m'.format(session, command))
 
 
 def get_memcached_configuration():
@@ -219,27 +210,27 @@ def setup_memcached_configuration(configuration_file_path):
 
 
 def install_benchmark_dependencies(args):
-  shell_call("mkdir benchmark")
+  util.shell_call("mkdir benchmark")
 
   path = os.getcwd()
   packages = get_known_packages()
 
   if args.process == 'nginx':
     if not os.path.exists('wrk2'):
-      shell_call('git clone https://github.com/sc2682cornell/wrk2.git')
+      util.shell_call('git clone https://github.com/sc2682cornell/wrk2.git')
     install('libssl-dev', packages)
     os.chdir('wrk2')
-    shell_call('make')
+    util.shell_call('make')
   elif args.process == 'memcached':
     if not os.path.exists('XcontainerBolt'):
-      shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+      util.shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
 
     os.chdir('XcontainerBolt/mutated')
-    shell_call('git submodule update --init')
+    util.shell_call('git submodule update --init')
     install('dh-autoreconf', packages)
-    shell_call('./autogen.sh')
-    shell_call('./configure')
-    shell_call('make')
+    util.shell_call('./autogen.sh')
+    util.shell_call('./configure')
+    util.shell_call('make')
 
   os.chdir(path)
 
@@ -341,7 +332,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
   results = []
   for rate in rates:
     benchmark_file = "{0:s}/r{1:d}-t{2:d}-c{3:d}-d{4:d}".format(instance_folder, rate, num_threads, num_connections, duration)
-    shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
+    util.shell_call('XcontainerBolt/wrk2/wrk -R{0:d} -t{1:d} -c{2:d} -d{3:d}s -L http://{4:s} > {5:s}'
                .format(rate, num_threads, num_connections, duration, args.benchmark_address, benchmark_file), True)
     results.append((rate, parse_nginx_benchmark(benchmark_file)))
     print(results[-1])
@@ -416,7 +407,7 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
 def memcached_benchmark(results, instance_folder, num_connections, address, rate, core):
   benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
   command = 'taskset -c {0:d} {1:s}mutated_memcache -z {2:d} -v {3:d} -n {4:d} -W 10000 {5:s} {6:d} > {7:s}'
-  shell_call(command.format(core, MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, num_connections, args.benchmark_address, rate, benchmark_file), True)
+  util.shell_call(command.format(core, MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, num_connections, args.benchmark_address, rate, benchmark_file), True)
 
 
 def run_memcached_benchmark(args):
@@ -427,7 +418,7 @@ def run_memcached_benchmark(args):
   print("Putting Memcached benchmarks in {0:s}".format(instance_folder))
 
   if not args.dry_run:
-    shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
+    util.shell_call('{0:s}load_memcache -z {1:d} -v {2:d} {3:s}'.format(MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, args.benchmark_address))
 
   rates = get_rates(args)
   results = []
@@ -475,20 +466,20 @@ def setup(args):
 
 
 def setup_port_forwarding(machine_ip, machine_port, container_ip, container_port, bridge_ip):
-  shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip))
+  util.shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip))
   container_sleep(1)
-  shell_call('iptables -I FORWARD -p tcp -s {0:s} -j ACCEPT'.format(container_ip))
+  util.shell_call('iptables -I FORWARD -p tcp -s {0:s} -j ACCEPT'.format(container_ip))
   container_sleep(1)
-  shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port))
+  util.shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port))
   container_sleep(1)
   command = 'iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
-  shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
+  util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
   container_sleep(1)
   command = 'iptables -t nat -I POSTROUTING -p tcp --dst {0:s} --dport {1:d} -j SNAT --to-source {2:s}'
-  shell_call(command.format(container_ip, container_port, bridge_ip))
+  util.shell_call(command.format(container_ip, container_port, bridge_ip))
   container_sleep(1)
   command = 'iptables -t nat -I OUTPUT --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
-  shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
+  util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
   container_sleep(1)
 
 
@@ -523,23 +514,23 @@ def setup_xcontainer(args):
   docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
   bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
-  shell_call('docker stop {0:s}'.format(name))
+  util.shell_call('docker stop {0:s}'.format(name))
   machine_ip = get_ip_address('em1')
-  shell_call('tmux new -s xcontainer -d')
+  util.shell_call('tmux new -s xcontainer -d')
   tmux_command('xcontainer', 'cd /root/experiments/native/compute06/docker')
   tmux_command('xcontainer', 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu={3:d}'.format(docker_id, xcontainer_ip, name, args.cores))
   container_sleep(5)
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
   print('Setup {0:s} X-Container on {1:s}:{2:d}'.format(args.process, machine_ip, machine_port))
-  shell_call('xl vcpu-pin memcached_container 0 {0:d}'.format(PROCESSOR))
-  shell_call('python /root/x-container/irq-balance.py')
-  shell_call('python /root/x-container/cpu-balance.py')
+  util.shell_call('xl vcpu-pin memcached_container 0 {0:d}'.format(PROCESSOR))
+  util.shell_call('python /root/x-container/irq-balance.py')
+  util.shell_call('python /root/x-container/cpu-balance.py')
 
 
 def destroy_xcontainer_container(name):
-  shell_call("xl destroy {0:s}".format(name))
-  shell_call("docker rm {0:s}".format(name))
-  shell_call("tmux kill-session -t xcontainer")
+  util.shell_call("xl destroy {0:s}".format(name))
+  util.shell_call("docker rm {0:s}".format(name))
+  util.shell_call("tmux kill-session -t xcontainer")
 
 
 def destroy_xcontainer(args):
@@ -560,33 +551,33 @@ def install_docker_dependencies():
   if 'docker-ce' in packages:
     print('docker-ce has already been installed')
   else:
-    shell_call('curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -')
-    shell_call('add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"')
-    shell_call('apt-get update')
-    shell_call('apt-get install -y docker-ce')
+    util.shell_call('curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -')
+    util.shell_call('add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"')
+    util.shell_call('apt-get update')
+    util.shell_call('apt-get install -y docker-ce')
 
   if args.benchmark_address == 'benchmark':
     if args.process == 'nginx':
       if not os.path.exists('wrk'):
-        shell_call('git clone https://github.com/wg/wrk.git')
-        shell_call('make -j4 -C wrk')
+        util.shell_call('git clone https://github.com/wg/wrk.git')
+        util.shell_call('make -j4 -C wrk')
     elif args.process == 'memcached':
       if not os.path.exists('XcontainerBolt'):
-        shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+        util.shell_call('git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
         path = os.getcwd()
         os.chdir('XcontainerBolt')
-        shell_call('git submodule update --init')
+        util.shell_call('git submodule update --init')
         os.chdir('mutated')
         install('dh-autoreconf', packages)
-        shell_call('./autogen.sh')
-        shell_call('./configure')
-        shell_call('make')
+        util.shell_call('./autogen.sh')
+        util.shell_call('./configure')
+        util.shell_call('make')
         os.chdir(path)
 
 
 def destroy_docker_container(name):
-  shell_call('docker stop ' + name)
-  shell_call('docker rm ' + name)
+  util.shell_call('docker stop ' + name)
+  util.shell_call('docker rm ' + name)
 
 
 def nginx_docker_port():
@@ -611,7 +602,7 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   if address is None:
     command = 'docker run --name {0:s} -P {1:s} -v {2:s}:/etc/nginx/nginx.conf:ro -d nginx'
     print(command)
-    shell_call(command.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
+    util.shell_call(command.format(NGINX_CONTAINER_NAME, cpu, configuration_file_path))
     container_sleep(5)
     address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   ports = nginx_docker_port()
@@ -655,12 +646,12 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
-    shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached memcached -m {4:d} -u root -t {5:d}'
+    util.shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached memcached -m {4:d} -u root -t {5:d}'
                .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE, MEMCACHED_THREADS)
                )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
-    shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
+    util.shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
 
   check_processor(args, MEMCACHED_CONTAINER_NAME)
   ports = memcached_docker_port()
@@ -736,7 +727,7 @@ def install_linux_dependencies():
 def linux_container_execute_command(name, command):
   c = 'lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"'
   print(c)
-  shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
+  util.shell_call('lxc-attach --name ' + name + ' -- /bin/sh -c "' + command + '"')
 
 
 def get_linux_container_ip(name):
@@ -767,7 +758,7 @@ def setup_linux(args):
 
     if container_ip is None:
       setup_linux_memcached_container()
-      shell_call("sudo lxc-cgroup -n {0:s} memory.limit_in_bytes 1G".format(name))
+      util.shell_call("sudo lxc-cgroup -n {0:s} memory.limit_in_bytes 1G".format(name))
   else:
     raise "setup_linux: Not implemented"
 
@@ -775,7 +766,7 @@ def setup_linux(args):
   if args.cores > 1:
     raise Exception("Error need to implement logic for multiple cores")
 
-  shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, PROCESSOR))
+  util.shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, PROCESSOR))
   check_processor(args, name)
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
@@ -786,8 +777,8 @@ def setup_linux(args):
 
 def start_linux_container(name):
   # TODO: Is this the template we want?
-  shell_call('lxc-create --name ' + name + ' -t ubuntu')
-  shell_call('lxc-start --name ' + name + ' -d')
+  util.shell_call('lxc-create --name ' + name + ' -t ubuntu')
+  util.shell_call('lxc-start --name ' + name + ' -d')
 
 
 def container_sleep(num_seconds):
@@ -818,15 +809,15 @@ def setup_linux_memcached_container():
   linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo truncate -s0 /etc/memcached.conf")
   for line in get_memcached_configuration().split("\n"):
     linux_container_execute_command(MEMCACHED_CONTAINER_NAME, "sudo echo '{0:s}' >> /etc/memcached.conf".format(line))
-  shell_call('tmux new -s linux -d')
+  util.shell_call('tmux new -s linux -d')
   tmux_command('linux', 'sudo lxc-attach -n {0:s}'.format(MEMCACHED_CONTAINER_NAME))
   container_sleep(5)
   tmux_command('linux', 'memcached -m {0:d} -u root -p {1:d} -l {2:s} -t {3:d} &'.format(MEMCACHED_SIZE, MEMCACHED_CONTAINER_PORT, container_ip, MEMCACHED_THREADS))
 
 
 def destroy_linux_container(name):
-  shell_call('lxc-stop --name ' + name)
-  shell_call('lxc-destroy --name ' + name)
+  util.shell_call('lxc-stop --name ' + name)
+  util.shell_call('lxc-destroy --name ' + name)
 
 
 def destroy_linux(args):
@@ -834,7 +825,7 @@ def destroy_linux(args):
     destroy_linux_container(NGINX_CONTAINER_NAME)
   elif args.process == "memcached":
     destroy_linux_container(MEMCACHED_CONTAINER_NAME)
-    shell_call('tmux kill-session -t linux')
+    util.shell_call('tmux kill-session -t linux')
 
 #################################################################################################
 # Main

@@ -46,6 +46,37 @@ def run_parallel_instances(fun):
     t.join()
 
 
+def benchmark_address(args):
+  ip_address = '128.253.51.86'
+  if args.process == 'nginx':
+    port = NGINX_MACHINE_PORT
+  elif args.process == 'memcached':
+    port = MEMCACHED_MACHINE_PORT
+  else:
+   raise Exception('benchmark_address: not implemented')
+
+  return '{0:s}:{1:d}'.format(ip_address, port)
+
+
+def check_benchmark(args):
+  benchmarks = [
+    'cpu'
+  ]
+
+  benchmark_tests = [
+    'bare'
+  ]
+
+  for benchmark in benchmarks:
+    benchmark_tests.append('{0:s}-same-container'.format(benchmark))
+    benchmark_tests.append('{0:s}-no-container-different-core'.format(benchmark))
+    benchmark_tests.append('{0:s}-different-container-same-logical-core'.format(benchmark))
+    benchmark_tests.append('{0:s}-different-container-different-logical-core'.format(benchmark))
+    benchmark_tests.append('{0:s}-different-container-different-physical-core'.format(benchmark))
+ 
+  if args.benchmark not in benchmark_tests:
+    raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.benchmark, '\n'.join(benchmark_tests))) 
+
 def check_git():
   util.shell_call('git remote update')
   output = util.shell_output("git status --untracked-files=no").strip().split("\n")
@@ -79,25 +110,26 @@ def check_last_run(args):
 
 
 def create_readme(args, folder):
-  last_commit = util.shell_output("git log --oneline -n 1")
+  last_commit = util.shell_output('git log --oneline -n 1')
   num_connections = get_num_connections(args)
   rates = get_rates(args)
-  f = open("{0:s}/README".format(folder), 'w+')
-  f.write("LAST COMMIT: {0:s}\n".format(last_commit))
-  f.write("CONTAINER: {0:s}\n".format(args.container))
-  f.write("PROCESS: {0:s}\n".format(args.process))
-  f.write("BENCHMARK ADDRESS: {0:s}\n".format(args.benchmark_address))
-  f.write("NUM CLIENTS: {0:d}\n".format(args.cores))
-  f.write("DURATION: {0:d}\n".format(args.duration))
-  f.write("CONNECTIONS: {0:d}\n".format(args.connections))
-  f.write("NUM CONNECTIONS PER CLIENT: {0:d}\n".format(num_connections))
-  f.write("RATES: {0:s}\n".format(str(rates)))
-  f.write("THREADS: {0:d}\n".format(args.threads))
-  f.write("DATE: {0:s}\n".format(args.date))
-  f.write("BOUND TO PROCESSOR: {0:d}\n".format(PROCESSOR))
-  if args.process == "memcached":
-    f.write("MEMCACHED SIZE(-m): {0:d}M\n".format(MEMCACHED_SIZE))
-    f.write("MEMCACHED THREADS(-t): {0:d}\n".format(MEMCACHED_THREADS))
+  f = open('{0:s}/README'.format(folder), 'w+')
+  f.write('LAST COMMIT: {0:s}\n'.format(last_commit))
+  f.write('CONTAINER: {0:s}\n'.format(args.container))
+  f.write('PROCESS: {0:s}\n'.format(args.process))
+  f.write('BENCHMARK ADDRESS: {0:s}\n'.format(args.benchmark_address))
+  f.write('NUM CLIENTS: {0:d}\n'.format(args.cores))
+  f.write('DURATION: {0:d}\n'.format(args.duration))
+  f.write('CONNECTIONS: {0:d}\n'.format(args.connections))
+  f.write('NUM CONNECTIONS PER CLIENT: {0:d}\n'.format(num_connections))
+  f.write('RATES: {0:s}\n'.format(str(rates)))
+  f.write('THREADS: {0:d}\n'.format(args.threads))
+  f.write('DATE: {0:s}\n'.format(args.date))
+  f.write('BOUND TO PROCESSOR: {0:d}\n'.format(PROCESSOR))
+  f.write('BENCHMARK TESTS: {0:s}\n'.format(args.benchmark))
+  if args.process == 'memcached':
+    f.write('MEMCACHED SIZE(-m): {0:d}M\n'.format(MEMCACHED_SIZE))
+    f.write('MEMCACHED THREADS(-t): {0:d}\n'.format(MEMCACHED_THREADS))
   f.close()
 
 
@@ -832,7 +864,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
-  parser.add_argument('-b', '--benchmark_address', type=str, help='Address and port to benchmark (localhost or 1.2.3.4:80)')
+  parser.add_argument('-b', '--benchmark', help='Type of benchmark test (bare, CPU)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   parser.add_argument('--cores', type=int, default=1, help='Number of cores')
   parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
@@ -844,7 +876,9 @@ if __name__ == '__main__':
 
   check_git()
 
-  if args.benchmark_address is not None:
+  if arg.benchmark != None:
+    check_benchmark(args)
+    args.benchmark_address = benchmark_address(args)
     if not args.dry_run:
       check_last_run(args)
     run_benchmarks(args)

@@ -384,7 +384,7 @@ def parse_memcached_benchmark(file_name, num_cores):
   m = MISSED_SENDS.match(lines[11].strip())
   missed_sends = float(m.group(3)) / num_cores
 
-  results = (float(throughput), avg_rtt, tail_rtt, min_rtt, missed_sends)
+  results = (float(throughput), missed_sends, avg_rtt, tail_rtt, min_rtt)
   return results
 
 
@@ -394,7 +394,7 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 
 def parse_memcached_results(args, instance_folder, num_connections, cores):
   rates = get_rates(args)
-  file_names = ["throughput", "avg_rtt", "tail_rtt", "min_rtt", "missed_sends"]
+  file_names = ["throughput", "missed_sends", "avg_rtt", "tail_rtt", "min_rtt"]
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for rate in rates:
@@ -404,8 +404,12 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
       core_results = parse_memcached_benchmark(benchmark_file, len(cores))
       for i in range(len(sums)):
         sums[i] += core_results[i]
-    files[0].write("{0:f},{1:d}\n".format(sums[0], len(cores) * rate))
-    for i in range(1, len(files)):
+    total_rate = len(cores) * rate
+    first_throughput_index = 2
+    for i in range(0, first_throughput_index):
+      files[0].write("{0:d},{1:f}\n".format(total_rate, sums[i])
+
+    for i in range(first_throughput_index, len(files)):
       files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))
 
   for f in files:

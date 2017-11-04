@@ -21,9 +21,9 @@ METRIC_MAP = {
 def title(name, process, instances):
   if process == 'memcached':
     plural = ""
-    if args.instances > 1:
+    if instances > 1:
       plural = "s"
-    return '{0:s} ({1:d} concurrent instance{2:s})'.format(mm['name'], args.instances, plural)
+    return '{0:s} ({1:d} concurrent instance{2:s})'.format(name, instances, plural)
   else:
     return name   
 
@@ -64,7 +64,7 @@ def create_graph(args):
     )
     data.append(trace)
 
-  layout = dict(title = title(mm['name'], args.process, args.instance), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
+  layout = dict(title = title(mm['name'], args.process, args.instances), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
   fig = dict(data=data, layout=layout)
   filename = '{0:s}-{1:s}-x{2:s}-d{3:s}-l{4:s}'.format(args.process, args.metric, args.xcontainer, args.docker, args.linux)
   py.iplot(fig, filename=filename)

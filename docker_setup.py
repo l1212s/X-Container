@@ -407,7 +407,7 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
     total_rate = len(cores) * rate
     first_throughput_index = 2
     for i in range(0, first_throughput_index):
-      files[0].write("{0:d},{1:f}\n".format(total_rate, sums[i]))
+      files[i].write("{0:d},{1:f}\n".format(total_rate, sums[i]))
 
     for i in range(first_throughput_index, len(files)):
       files[i].write("{0:f},{1:f}\n".format(sums[0], sums[i]))

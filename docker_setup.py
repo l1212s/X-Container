@@ -394,7 +394,7 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 
 def parse_memcached_results(args, instance_folder, num_connections, cores):
   rates = get_rates(args)
-  file_names = ["throughput", "missed_sends", "avg_rtt", "tail_rtt", "min_rtt"]
+  file_names = ["throughput", "missed_sends", "avg_latency", "tail_latency", "min_latency"]
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for rate in rates:

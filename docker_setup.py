@@ -355,7 +355,7 @@ def run_nginx_benchmark(args, num_connections, num_threads, duration):
 
 STATS = re.compile("([0-9]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)\t([0-9\.]+)")
 BUFFER = re.compile("([RT][X]): ([0-9\.]+ [A-Za-z\/]+) \(([0-9\.]+ [A-Za-z\/]+)\)")
-MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.%]+)\)")
+MISSED_SENDS = re.compile("Missed sends: ([0-9]+) / ([0-9]+) \(([0-9\.]+)%\)")
 MUTATED_FOLDER = 'XcontainerBolt/mutated/client/'
 NUM_MEMCACHED_KEYS = 10*1024
 MEMCACHED_VALUE_SIZE = 200
@@ -382,9 +382,9 @@ def parse_memcached_benchmark(file_name):
   transmit = m.group(2)
 
   m = MISSED_SENDS.match(lines[11].strip())
-  missed_sends = m.group(3)
+  missed_sends = float(m.group(3))
 
-  results = (float(throughput), avg_rtt, tail_rtt, min_rtt, avg_load_generator_queue, tail_load_generator_queue, receive, transmit, missed_sends)
+  results = (float(throughput), avg_rtt, tail_rtt, min_rtt, missed_sends)
   return results
 
 
@@ -394,7 +394,7 @@ def get_memcached_benchmark_file(instance_folder, rate, num_connections, core):
 
 def parse_memcached_results(args, instance_folder, num_connections, cores):
   rates = get_rates(args)
-  file_names = ["throughput", "avg_rtt", "tail_rtt", "min_rtt"]
+  file_names = ["throughput", "avg_rtt", "tail_rtt", "min_rtt", "missed_sends"]
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for rate in rates:

@@ -75,8 +75,8 @@ def create_graph(args):
 
   layout = dict(title = title(mm['name'], args.process, args.instances), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
   fig = dict(data=data, layout=layout)
-  filename = '{0:s}-{1:s}-x{2:s}-d{3:s}-l{4:s}'.format(args.process, args.metric, args.xcontainer, args.docker, args.linux)
-  py.iplot(fig, filename=filename)
+  filename = '{0:s}-{1:s}-i{2:d}-x{3:s}-d{4:s}-l{5:s}'.format(args.process, args.metric, args.instances, args.xcontainer, args.docker, args.linux)
+  py.plot(fig, filename=filename)
 
 def main():
   args = parse_arguments()

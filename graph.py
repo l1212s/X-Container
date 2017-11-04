@@ -80,7 +80,12 @@ def create_graph(args):
 
 def main():
   args = parse_arguments()
-  create_graph(args)
+  if args.metric == 'all':
+    for metric in METRIC_MAP.keys():
+      args.metric = metric 
+      create_graph(args)
+  else:
+    create_graph(args)
 
 if __name__ == '__main__':
   main()

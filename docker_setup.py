@@ -5,6 +5,7 @@ import re
 import subprocess
 import threading
 import time
+import util
 
 NGINX_CONTAINER_NAME = "nginx_container"
 NGINX_MACHINE_PORT = 80
@@ -56,20 +57,16 @@ def check_git():
     raise Exception("Commit your code before you run this script!")
 
 
-def container_folder(args):
-  return "benchmark/{0:s}-{1:s}".format(args.process, args.container)
-
-
 def create_benchmark_folder(args):
-  folder = container_folder(args)
-  shell_call("mkdir {0:s}".format(folder))
-  instance_folder = "{0:s}/{1:s}".format(folder, args.date)
+  container_folder = util.container_folder(args)
+  shell_call("mkdir {0:s}".format(container_folder))
+  instance_folder = util.instance_folder(container_folder, args.date)
   shell_call("mkdir {0:1}".format(instance_folder))
   return instance_folder
 
 
 def check_last_run(args):
-  folder = container_folder(args)
+  folder = util.container_folder(args)
   output = shell_output("ls {0:s}".format(folder)).strip().split("\n")
   if len(output) == 0:
     return

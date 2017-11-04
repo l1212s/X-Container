@@ -361,7 +361,7 @@ NUM_MEMCACHED_KEYS = 10*1024
 MEMCACHED_VALUE_SIZE = 200
 
 
-def parse_memcached_benchmark(file_name):
+def parse_memcached_benchmark(file_name, num_cores):
   f = open(file_name, "r")
   lines = f.readlines()
 
@@ -382,7 +382,7 @@ def parse_memcached_benchmark(file_name):
   transmit = m.group(2)
 
   m = MISSED_SENDS.match(lines[11].strip())
-  missed_sends = float(m.group(3))
+  missed_sends = float(m.group(3)) / num_cores
 
   results = (float(throughput), avg_rtt, tail_rtt, min_rtt, missed_sends)
   return results
@@ -401,7 +401,7 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
     sums = map(lambda f: 0.0, file_names)
     for core in cores:
       benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
-      core_results = parse_memcached_benchmark(benchmark_file)
+      core_results = parse_memcached_benchmark(benchmark_file, len(cores))
       for i in range(len(sums)):
         sums[i] += core_results[i]
     files[0].write("{0:f},{1:d}\n".format(sums[0], len(cores) * rate))

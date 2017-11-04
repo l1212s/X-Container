@@ -48,7 +48,7 @@ def run_parallel_instances(fun):
 
 def check_git():
   util.shell_call('git remote update')
-  output = shell_output("git status --untracked-files=no").strip().split("\n")
+  output = util.shell_output("git status --untracked-files=no").strip().split("\n")
   # Clean state should look like
   # On branch master
   # Your branch is up-to-date with 'origin/master'
@@ -67,7 +67,7 @@ def create_benchmark_folder(args):
 
 def check_last_run(args):
   folder = util.container_folder(args.process, args.container)
-  output = shell_output("ls {0:s}".format(folder)).strip().split("\n")
+  output = util.shell_output("ls {0:s}".format(folder)).strip().split("\n")
   if len(output) == 0:
     return
 
@@ -79,7 +79,7 @@ def check_last_run(args):
 
 
 def create_readme(args, folder):
-  last_commit = shell_output("git log --oneline -n 1")
+  last_commit = util.shell_output("git log --oneline -n 1")
   num_connections = get_num_connections(args)
   rates = get_rates(args)
   f = open("{0:s}/README".format(folder), 'w+')
@@ -101,17 +101,8 @@ def create_readme(args, folder):
   f.close()
 
 
-def shell_output(command, showCommand=False):
-  if showCommand:
-    print('RUNNING COMMAND: ' + command)
-  output = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()[0]
-  if showCommand:
-    print('')
-  return output
-
-
 def get_known_packages():
-  output = shell_output('dpkg --get-selections').decode('utf-8')
+  output = util.shell_output('dpkg --get-selections').decode('utf-8')
   lines = output.split('\n')
   packages = list(map(lambda x: x.split('\t')[0], lines))
   packages = list(filter(lambda x: len(x) > 0, packages))
@@ -133,7 +124,7 @@ def install_common_dependencies(packages):
 
 
 def get_ip_address(name):
-  return shell_output("/sbin/ifconfig {0:s} | grep 'inet addr:' | cut -d: -f2 | awk '{{ print $1 }}'".format(name)).strip()
+  return util.shell_output("/sbin/ifconfig {0:s} | grep 'inet addr:' | cut -d: -f2 | awk '{{ print $1 }}'".format(name)).strip()
 
 
 def get_nginx_configuration():
@@ -320,7 +311,7 @@ def get_num_connections(args):
 
 
 def get_date():
-  return shell_output('date +%F-%H-%M-%S').strip()
+  return util.shell_output('date +%F-%H-%M-%S').strip()
 
 
 def run_nginx_benchmark(args, num_connections, num_threads, duration):
@@ -511,7 +502,7 @@ def setup_xcontainer(args):
   else:
     raise Exception("setup_xcontainer: not implemented")
 
-  docker_id = shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
+  docker_id = util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(name)).strip()
   bridge_ip = get_ip_address('xenbr0')
   xcontainer_ip = generate_xcontainer_ip(bridge_ip)
   util.shell_call('docker stop {0:s}'.format(name))
@@ -621,10 +612,10 @@ def check_processor(args, name):
     print("here")
     command = "sudo docker inspect -f '{{{{.HostConfig.CpusetCpus}}}}' {0:s}".format(name)
     print(command)
-    output = shell_output(command).strip()
+    output = util.shell_output(command).strip()
     print(output)
   elif args.container == "linux":
-    output = shell_output("lxc-cgroup -n {0:s} cpuset.cpus".format(name)).strip()
+    output = util.shell_output("lxc-cgroup -n {0:s} cpuset.cpus".format(name)).strip()
   else:
     return
   print(output)
@@ -672,7 +663,7 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
 
 def docker_port(name, regex):
   try:
-    output = shell_output('docker port {0:s}'.format(name))
+    output = util.shell_output('docker port {0:s}'.format(name))
     results = re.findall(regex, output)
     if len(results) == 0:
       return None
@@ -685,7 +676,7 @@ def docker_port(name, regex):
 def docker_ip(name, docker_filter):
   print(docker_filter, name)
   try:
-    output = shell_output("docker inspect -f '{0:s}' {1:s}".format(docker_filter, name))
+    output = util.shell_output("docker inspect -f '{0:s}' {1:s}".format(docker_filter, name))
     output = output.strip()
     if output == "":
       return None
@@ -732,7 +723,7 @@ def linux_container_execute_command(name, command):
 
 def get_linux_container_ip(name):
   try:
-    output = shell_output('lxc-info -n {:s} -iH'.format(name))
+    output = util.shell_output('lxc-info -n {:s} -iH'.format(name))
     output = output.decode('utf-8').strip()
     if output == "":
       return None

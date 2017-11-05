@@ -857,7 +857,7 @@ if __name__ == '__main__':
 
   check_git()
 
-  if arg.benchmark != None:
+  if args.benchmark != None:
     util.check_benchmark(args)
     args.benchmark_address = benchmark_address(args)
     if not args.dry_run:

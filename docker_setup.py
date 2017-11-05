@@ -15,7 +15,6 @@ MEMCACHED_MACHINE_PORT = 11211
 MEMCACHED_CONTAINER_PORT = 11211
 DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
-PROCESSOR = 19
 MEMCACHED_SIZE = 512
 MEMCACHED_THREADS = 4
 
@@ -53,7 +52,7 @@ def benchmark_address(args):
   elif args.process == 'memcached':
     port = MEMCACHED_MACHINE_PORT
   else:
-   raise Exception('benchmark_address: not implemented')
+    raise Exception('benchmark_address: not implemented')
 
   return '{0:s}:{1:d}'.format(ip_address, port)
 
@@ -94,6 +93,7 @@ def create_readme(args, folder):
   last_commit = util.shell_output('git log --oneline -n 1')
   num_connections = get_num_connections(args)
   rates = get_rates(args)
+
   f = open('{0:s}/README'.format(folder), 'w+')
   f.write('LAST COMMIT: {0:s}\n'.format(last_commit))
   f.write('CONTAINER: {0:s}\n'.format(args.container))
@@ -106,7 +106,7 @@ def create_readme(args, folder):
   f.write('RATES: {0:s}\n'.format(str(rates)))
   f.write('THREADS: {0:d}\n'.format(args.threads))
   f.write('DATE: {0:s}\n'.format(args.date))
-  f.write('BOUND TO PROCESSOR: {0:d}\n'.format(PROCESSOR))
+  f.write("BOUND TO PROCESSOR: {0:d}\n".format(util.processor(0)))
   f.write('BENCHMARK TEST: {0:s}\n'.format(args.benchmark))
   if args.process == 'memcached':
     f.write('MEMCACHED SIZE(-m): {0:d}M\n'.format(MEMCACHED_SIZE))
@@ -365,13 +365,13 @@ def parse_memcached_benchmark(file_name, num_cores):
   tail_rtt = float(m.group(5))
 
   m = STATS.match(lines[7].strip())
-  avg_load_generator_queue = m.group(2)
-  tail_load_generator_queue = m.group(5)
+#  avg_load_generator_queue = m.group(2)
+#  tail_load_generator_queue = m.group(5)
 
-  m = BUFFER.match(lines[9].strip())
-  receive = m.group(2)
-  m = BUFFER.match(lines[10].strip())
-  transmit = m.group(2)
+#  m = BUFFER.match(lines[9].strip())
+#  receive = m.group(2)
+#  m = BUFFER.match(lines[10].strip())
+#  transmit = m.group(2)
 
   m = MISSED_SENDS.match(lines[11].strip())
   missed_sends = float(m.group(3)) / num_cores
@@ -426,9 +426,7 @@ def run_memcached_benchmark(args):
 
   rates = get_rates(args)
   results = []
-  cores = []
-  for i in range(args.cores):
-    cores.append(PROCESSOR + 2*i)
+  cores = util.physical_processors(args.cores)
 
   if not args.dry_run:
     for rate in rates:
@@ -526,7 +524,7 @@ def setup_xcontainer(args):
   container_sleep(5)
   setup_port_forwarding(machine_ip, machine_port, xcontainer_ip, container_port, bridge_ip)
   print('Setup {0:s} X-Container on {1:s}:{2:d}'.format(args.process, machine_ip, machine_port))
-  util.shell_call('xl vcpu-pin memcached_container 0 {0:d}'.format(PROCESSOR))
+  util.shell_call('xl vcpu-pin memcached_container 0 {0:d}'.format(util.processor(0)))
   util.shell_call('python /root/x-container/irq-balance.py')
   util.shell_call('python /root/x-container/cpu-balance.py')
 
@@ -600,7 +598,7 @@ def create_docker_nginx_container(args, docker_filter, is_xcontainer=False):
   address = docker_ip(NGINX_CONTAINER_NAME, docker_filter)
   if args.cores > 1:
     raise "multi-core not implemented"
-  cpu = "--cpuset-cpus={0:d}".format(PROCESSOR)
+  cpu = "--cpuset-cpus={0:d}".format(util.processor(0))
   if is_xcontainer:
     cpu = ""
   if address is None:
@@ -632,8 +630,8 @@ def check_processor(args, name):
   else:
     return
   print(output)
-  if output != str(PROCESSOR):
-    raise Exception("Error. Container is not bound to processor {0:d}".format(PROCESSOR))
+  if output != str(util.processor(0)):
+    raise Exception("Error. Container is not bound to processor {0:d}".format(util.processor(0)))
 
 
 def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
@@ -644,15 +642,15 @@ def setup_docker_memcached_container(args, docker_filter, is_xcontainer=False):
   address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   if args.cores > 1 and not is_xcontainer:
     raise "multi-core not implemented"
-  cpu = "--cpuset-cpus={0:d}".format(PROCESSOR)
+  cpu = "--cpuset-cpus={0:d}".format(util.processor(0))
   if is_xcontainer:
     cpu = ""
 
   if address is None:
     # TODO: Way to pass in memcached parameters like memory size
     util.shell_call('docker run --name {0:s} -P {1:s} -p 0.0.0.0:{2:d}:{3:d} -d memcached memcached -m {4:d} -u root -t {5:d}'
-               .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE, MEMCACHED_THREADS)
-               )
+                    .format(MEMCACHED_CONTAINER_NAME, cpu, MEMCACHED_MACHINE_PORT, MEMCACHED_CONTAINER_PORT, MEMCACHED_SIZE, MEMCACHED_THREADS)
+                   )
     address = docker_ip(MEMCACHED_CONTAINER_NAME, docker_filter)
   else:
     util.shell_call('docker start --name {0:s}'.format(MEMCACHED_CONTAINER_NAME))
@@ -770,7 +768,7 @@ def setup_linux(args):
   if args.cores > 1:
     raise Exception("Error need to implement logic for multiple cores")
 
-  util.shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, PROCESSOR))
+  util.shell_call("sudo lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(name, util.processor(0)))
   check_processor(args, name)
   machine_ip = get_ip_address('eno1')
   bridge_ip = get_ip_address('lxcbr0')
@@ -857,7 +855,7 @@ if __name__ == '__main__':
 
   check_git()
 
-  if args.benchmark != None:
+  if args.benchmark is not None:
     util.check_benchmark(args)
     args.benchmark_address = benchmark_address(args)
     if not args.dry_run:

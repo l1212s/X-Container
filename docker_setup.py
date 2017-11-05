@@ -107,7 +107,7 @@ def create_readme(args, folder):
   f.write('THREADS: {0:d}\n'.format(args.threads))
   f.write('DATE: {0:s}\n'.format(args.date))
   f.write('BOUND TO PROCESSOR: {0:d}\n'.format(PROCESSOR))
-  f.write('BENCHMARK TESTS: {0:s}\n'.format(args.benchmark))
+  f.write('BENCHMARK TEST: {0:s}\n'.format(args.benchmark))
   if args.process == 'memcached':
     f.write('MEMCACHED SIZE(-m): {0:d}M\n'.format(MEMCACHED_SIZE))
     f.write('MEMCACHED THREADS(-t): {0:d}\n'.format(MEMCACHED_THREADS))

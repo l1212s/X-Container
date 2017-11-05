@@ -34,6 +34,7 @@ def check_benchmark(args):
   for benchmark in benchmarks:
     benchmark_tests.append('{0:s}-same-container'.format(benchmark))
     benchmark_tests.append('{0:s}-no-container-different-core'.format(benchmark))
+    benchmark_tests.append('{0:s}-no-container-same-core'.format(benchmark))
     benchmark_tests.append('{0:s}-different-container-same-logical-core'.format(benchmark))
     benchmark_tests.append('{0:s}-different-container-different-logical-core'.format(benchmark))
     benchmark_tests.append('{0:s}-different-container-different-physical-core'.format(benchmark))

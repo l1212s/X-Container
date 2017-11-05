@@ -21,17 +21,19 @@ METRIC_MAP = {
   'missed_sends': metric_values('Missed Sends', 'Requests Per Second', 'Missed Sends (%)', 'lines+markers'),
 }
 
-def title(name, process, instances):
+def title(name, process, instances, benchmark):
+  n = '{0:s} ({1:s})'.format(name, benchmark)
   if process == 'memcached':
     plural = ""
     if instances > 1:
       plural = "s"
-    return '{0:s} ({1:d} concurrent instance{2:s})'.format(name, instances, plural)
+    return '{0:s} ({1:d} concurrent instance{2:s})'.format(n, instances, plural)
   else:
-    return name   
+    return n 
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
+  parser.add_argument('-b', '--benchmark', help='Type of benchmark test (bare, CPU)')
   parser.add_argument('-d', '--docker', required=True, help='Docker folder to use')
   parser.add_argument('-l', '--linux', required=True, help='Linux folder to use')
   parser.add_argument('-m', '--metric', required=True, help='Metric to graph')
@@ -39,6 +41,8 @@ def parse_arguments():
   parser.add_argument('-x', '--xcontainer', required=True, help='X-Container folder to use')
   parser.add_argument('-i', '--instances', type=int, default=1, help='Number of concurrent instances of benchmark running')
   args = parser.parse_args()
+  util.check_benchmark(args)
+
   return args
 
 def create_graph(args):
@@ -73,9 +77,9 @@ def create_graph(args):
     )
     data.append(trace)
 
-  layout = dict(title = title(mm['name'], args.process, args.instances), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
+  layout = dict(title = title(mm['name'], args.process, args.instances, args.benchmark), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
   fig = dict(data=data, layout=layout)
-  filename = '{0:s}-{1:s}-i{2:d}-x{3:s}-d{4:s}-l{5:s}'.format(args.process, args.metric, args.instances, args.xcontainer, args.docker, args.linux)
+  filename = '{0:s}-{1:s}-b{2:d}-i{3:d}-x{4:s}-d{5:s}-l{6:s}'.format(args.process, args.metric, args.benchmark, args.instances, args.xcontainer, args.docker, args.linux)
   py.plot(fig, filename=filename)
 
 def main():

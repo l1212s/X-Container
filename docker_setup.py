@@ -58,25 +58,6 @@ def benchmark_address(args):
   return '{0:s}:{1:d}'.format(ip_address, port)
 
 
-def check_benchmark(args):
-  benchmarks = [
-    'cpu'
-  ]
-
-  benchmark_tests = [
-    'bare'
-  ]
-
-  for benchmark in benchmarks:
-    benchmark_tests.append('{0:s}-same-container'.format(benchmark))
-    benchmark_tests.append('{0:s}-no-container-different-core'.format(benchmark))
-    benchmark_tests.append('{0:s}-different-container-same-logical-core'.format(benchmark))
-    benchmark_tests.append('{0:s}-different-container-different-logical-core'.format(benchmark))
-    benchmark_tests.append('{0:s}-different-container-different-physical-core'.format(benchmark))
- 
-  if args.benchmark not in benchmark_tests:
-    raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.benchmark, '\n'.join(benchmark_tests))) 
-
 def check_git():
   util.shell_call('git remote update')
   output = util.shell_output("git status --untracked-files=no").strip().split("\n")
@@ -877,7 +858,7 @@ if __name__ == '__main__':
   check_git()
 
   if arg.benchmark != None:
-    check_benchmark(args)
+    util.check_benchmark(args)
     args.benchmark_address = benchmark_address(args)
     if not args.dry_run:
       check_last_run(args)

@@ -111,7 +111,7 @@ def create_readme(args, folder):
   f.write('THREADS: {0:d}\n'.format(args.threads))
   f.write('DATE: {0:s}\n'.format(args.date))
   f.write("BOUND TO PROCESSOR: {0:d}\n".format(util.processor(0)))
-  f.write('BENCHMARK TEST: {0:s}\n'.format(args.benchmark))
+  f.write('BENCHMARK TEST: {0:s}\n'.format(args.test))
   if args.process == 'memcached':
     f.write('MEMCACHED SIZE(-m): {0:d}M\n'.format(MEMCACHED_SIZE))
     f.write('MEMCACHED THREADS(-t): {0:d}\n'.format(MEMCACHED_THREADS))
@@ -847,7 +847,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--container', help='Indicate type of container (docker, linux)')
   parser.add_argument('-p', '--process', required=True, help='Indicate which process to run on docker (NGINX, Spark, etc)')
-  parser.add_argument('-b', '--benchmark', help='Type of benchmark test (bare, CPU)')
+  parser.add_argument('-t', '--test', help='Type of benchmark test (bare, CPU)')
   parser.add_argument('-d', '--destroy', action='store_true', default=False, help='Destroy associated container')
   parser.add_argument('--cores', type=int, default=1, help='Number of cores')
   parser.add_argument('--duration', type=int, default=60, help='Benchmark duration')
@@ -859,7 +859,7 @@ if __name__ == '__main__':
 
   check_git()
 
-  if args.benchmark is not None:
+  if args.test is not None:
     util.check_benchmark(args)
     args.benchmark_address = benchmark_address(args)
     if not args.dry_run:

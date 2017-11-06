@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 START_PROCESSOR = 18
@@ -32,7 +33,10 @@ def instance_folder(cf, date):
 
 def check_benchmark(args):
   benchmarks = [
-    'cpu'
+    'cpu',
+    'memBw-1',
+    'memBw-5',
+    'memBw-9',
   ]
 
   benchmark_tests = [
@@ -48,7 +52,10 @@ def check_benchmark(args):
     benchmark_tests.append('{0:s}-different-container-different-logical-core'.format(benchmark))
     benchmark_tests.append('{0:s}-different-container-different-core'.format(benchmark))
 
-  if args.benchmark not in benchmark_tests:
+  if args.test == 'help':
+    print('Choose from the following:\n{0:s}'.format('\n'.join(benchmark_tests)))
+    os.exit(0)
+  elif args.test not in benchmark_tests:
     raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.benchmark, '\n'.join(benchmark_tests)))
 
 

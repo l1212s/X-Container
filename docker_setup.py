@@ -82,11 +82,13 @@ def check_last_run(args):
   if len(output) == 0:
     return
 
-  output.sort()
-  last = output[-1]
-  filename = "{0:s}/{1:s}/README".format(folder, last)
-  if "NOTE: " not in open(filename).read():
-    raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
+  output.sort(reverse=True)
+  for date in output:
+    filename = "{0:s}/{1:s}/README".format(folder, date)
+    lines = open(filename).read()
+    if ('BENCHMARK TEST: {0:s}\n'.format(args.benchmark) in lines) or ('BENCHMARK TEST:' not in lines and args.benchmark == 'bare'):
+      if "NOTE: " not in lines:
+        raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
 
 
 def create_readme(args, folder):

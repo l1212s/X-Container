@@ -88,7 +88,7 @@ def check_last_run(args):
     if not os.path.isfile(filename):
       continue
     lines = open(filename).read()
-    if ('BENCHMARK TEST: {0:s}\n'.format(args.benchmark) in lines) or ('BENCHMARK TEST:' not in lines and args.benchmark == 'bare'):
+    if ('BENCHMARK TEST: {0:s}\n'.format(args.test) in lines) or ('BENCHMARK TEST:' not in lines and args.test == 'bare'):
       if "NOTE: " not in lines:
         raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
 

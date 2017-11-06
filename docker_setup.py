@@ -85,6 +85,8 @@ def check_last_run(args):
   output.sort(reverse=True)
   for date in output:
     filename = "{0:s}/{1:s}/README".format(folder, date)
+    if not os.path.isfile(filename):
+      continue
     lines = open(filename).read()
     if ('BENCHMARK TEST: {0:s}\n'.format(args.benchmark) in lines) or ('BENCHMARK TEST:' not in lines and args.benchmark == 'bare'):
       if "NOTE: " not in lines:

@@ -56,7 +56,7 @@ def check_benchmark(args):
     print('Choose from the following:\n{0:s}'.format('\n'.join(benchmark_tests)))
     os.exit(0)
   elif args.test not in benchmark_tests:
-    raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.benchmark, '\n'.join(benchmark_tests)))
+    raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.test, '\n'.join(benchmark_tests)))
 
 
 def processor(i):

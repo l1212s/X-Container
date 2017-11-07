@@ -128,6 +128,8 @@ class DockerContainer(Container):
     cpu = '-P --cpuset-cpus={0:d}'.format(self.processor)
     util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, cpu, v, p, self.application, self.args()))
     time.sleep(5)
+   # util.shell_call('docker cp ~/X-Container/XcontainerBolt {0:s}:~'.format(self.name))
+#    util.shell_call('docker cp ~/.git-credential-cache {0:s}:/home/root'.format(self.name))
 
   def setup(self):
     # Do nothing
@@ -201,7 +203,6 @@ class BenchmarkContainer(Container):
     self.intensity = intensity
     self.duration = 7200
     self.tmux_name = 'benchmark'
-    self.intensity = 0
 
   def start(self):
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name))

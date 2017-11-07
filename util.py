@@ -34,10 +34,11 @@ def instance_folder(cf, date):
 def check_benchmark(args):
   benchmarks = [
     'cpu',
-    'memBw-1',
-    'memBw-5',
-    'memBw-9',
   ]
+
+  for benchmark in ['memBw', 'memCap']:
+    for i in [1, 5, 9]:
+      benchmarks.append('{0:s}-{1:d}'.format(benchmark, i))
 
   benchmark_tests = [
     'bare'

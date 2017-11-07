@@ -268,7 +268,7 @@ class BenchmarkContainer(Container):
     util.tmux_command(self.tmux_name, 'apt-get install -y make')
     util.tmux_command(self.tmux_name, 'apt-get install -y g++')
     util.tmux_command(self.tmux_name, 'apt-get install -y ca-certificates')
-    util.tmux_command(self.tmux_name, 'git clone https://sj677:aim9191!@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+    util.tmux_command(self.tmux_name, 'git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
     util.tmux_command(self.tmux_name, 'cd XcontainerBolt/uBench; make')
     time.sleep(2*60)
 

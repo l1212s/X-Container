@@ -35,8 +35,8 @@ def check_benchmark(args):
   benchmarks = [
     'cpu',
     'memBw-1',
-    'memBw-50',
-    'memBw-100',
+    'memBw-5',
+    'memBw-9',
   ]
 
   benchmark_tests = [

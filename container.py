@@ -115,6 +115,12 @@ class DockerContainer(Container):
   def bridge_ip(self):
     return util.get_ip_address('docker0')
 
+  def cpu(self):
+    return '-P --cpuset-cpus={0:d}'.format(self.processor)
+
+  def id(self):
+    return util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(self.name)).strip()
+
   def start(self):
     # TODO: X-Container
     v = ''
@@ -125,15 +131,54 @@ class DockerContainer(Container):
     if self.ports() != '':
       p = '-p {0:s}'.format(self.ports())
 
-    cpu = '-P --cpuset-cpus={0:d}'.format(self.processor)
-    util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, cpu, v, p, self.application, self.args()))
+    util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, self.cpu(), v, p, self.application, self.args()))
     time.sleep(5)
-   # util.shell_call('docker cp ~/X-Container/XcontainerBolt {0:s}:~'.format(self.name))
-#    util.shell_call('docker cp ~/.git-credential-cache {0:s}:/home/root'.format(self.name))
 
   def setup(self):
     # Do nothing
     return
+
+
+class XContainer(DockerContainer):
+  def __init__(self, name, application, processor, ip_offset):
+    Container.__init__(self, name, 'xcontainer', application, processor)
+    self.tmux_name = '{0:s}_xcontainer'.format(name)
+    self.ip_offset = ip_offset
+
+  def destroy(self):
+    util.shell_call('xl destroy {0:s}'.format(self.name))
+    DockerContainer.destroy(self)
+
+  def cpu(self):
+    return ''
+
+  def bridge_ip(self):
+    return util.get_ip_address('xenbr0')
+
+  def ip(self):
+    parts = self.bridge_ip().split(".")
+    last = int(parts[-1])
+    # Choose next IP address as X-Container IP
+    new_last = (last + self.ip_offset) % 255
+    parts[-1] = str(new_last)
+    return ".".join(parts)
+
+  def machine_ip(self):
+    return util.get_ip_address('em1')
+
+  def start(self):
+    DockerContainer.start(self)
+
+  def setup(self):
+    util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name))
+    util.tmux_command(self.tmux_name, 'lxc-attach -n {0:s}'.format(self.name))
+    util.shell_call('docker stop {0:s}'.format(self.name))
+    util.tmux_command(self.tmux_name, 'cd /root/experiments/native/compute06/docker')
+    util.tmux_command(self.tmux_name, 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(DockerContainer.id(), self.ip(), self.name))
+    time.sleep(5)
+    util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(self.name, util.processor(0)))
+    util.shell_call('python /root/x-container/irq-balance.py')
+    util.shell_call('python /root/x-container/cpu-balance.py')
 
 
 class ApplicationContainer(Container):
@@ -177,6 +222,16 @@ class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached)
     ApplicationContainer.benchmark_message(self)
 
 
+class MemcachedXContainer(DockerContainer, MemcachedDockerContainer):
+  def __init__(self, processor):
+    XContainer.__init__(self, 'memcached_container', 'memcached', processor, 1)
+
+  def setup(self):
+    XContainer.setup(self)
+    MemcachedDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+    MemcachedDockerContainer.benchmark_message(self)
+
+
 class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
   def __init__(self, processor):
     LinuxContainer.__init__(self, 'memcached_container', 'memcached', processor)
@@ -213,9 +268,9 @@ class BenchmarkContainer(Container):
     util.tmux_command(self.tmux_name, 'apt-get install -y make')
     util.tmux_command(self.tmux_name, 'apt-get install -y g++')
     util.tmux_command(self.tmux_name, 'apt-get install -y ca-certificates')
-    util.tmux_command(self.tmux_name, 'git clone https://github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+    util.tmux_command(self.tmux_name, 'git clone https://sj677:aim9191!@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
     util.tmux_command(self.tmux_name, 'cd XcontainerBolt/uBench; make')
-    time.sleep(60)
+    time.sleep(2*60)
 
   def benchmark(self):
     args = ''
@@ -247,10 +302,10 @@ class BenchmarkLinuxContainer(LinuxContainer, BenchmarkContainer):
 
 
 class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
-  def __init__(self, metric, intensity, application, processor):
+  def __init__(self, metric, intensity, application, processor, container='docker'):
     name = 'benchmark_docker_container'
     DockerContainer.__init__(self, name, 'bash', processor)
-    BenchmarkContainer.__init__(self, metric, intensity, name, 'docker', application, processor)
+    BenchmarkContainer.__init__(self, metric, intensity, name, container, application, processor)
 
   def setup(self):
     DockerContainer.setup(self)
@@ -269,9 +324,36 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
   def ports(self):
     return ''
 
+  def cpu(self):
+    return '--cpuset-cpus={0:d}'.format(self.processor)
+
   def start(self):
     BenchmarkContainer.start(self)
-    util.tmux_command(self.tmux_name, 'docker run --name {0:s} --cpuset-cpus={1:d} -i ubuntu /bin/bash'.format(self.name, self.processor))
+    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpu()))
+
+
+class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContainer):
+  def __init__(self, metric, intensity, application, processor):
+    name = 'benchmark_xcontainer'
+    XContainer.__init__(self, name, 'bash', processor, 2)
+    BenchmarkDockerContainer.__init__(self, metric, intensity, name, application, processor, 'xcontainer')
+
+  def setup(self):
+    XContainer.setup(self)
+    BenchmarkContainer.setup(self)
+
+  def destroy(self):
+    XContainer.destroy(self)
+    BenchmarkContainer.destroy(self)
+
+  def cpu(self):
+    return ''
+
+  def start(self):
+    BenchmarkDockerContainer.start(self)
+    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpu()))
+    BenchmarkDockerContainer.setup(self)
+    XContainer.setup(self)
 
 
 def get_benchmark_processor(test):
@@ -316,6 +398,9 @@ def setup_containers(args):
     elif args.container == 'docker':
       m = MemcachedDockerContainer(util.processor(0))
       b = BenchmarkDockerContainer(args.metric, args.intensity, args.application, p)
+    elif args.container == 'xcontainer':
+      m = MemcachedXContainer(util.processor(0))
+      b = BenchmarkXContainer(args.metric, args.intensity, args.application, p)
 
     if args.destroy:
       m.destroy()

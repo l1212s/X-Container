@@ -201,7 +201,7 @@ class BenchmarkContainer(Container):
     self.intensity = intensity
     self.duration = 7200
     self.tmux_name = 'benchmark'
-    self.intensity = 0
+    self.intensity = intensity
 
   def start(self):
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name))

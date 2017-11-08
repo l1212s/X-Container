@@ -179,7 +179,6 @@ class XContainer(DockerContainer):
     util.shell_call('docker stop {0:s}'.format(self.name))
     time.sleep(1)
     util.tmux_command(self.tmux_name, 'cd /root/experiments/native/compute06/docker')
-    time.sleep(1)
     util.tmux_command(self.tmux_name, 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(DockerContainer.id(self), self.ip(), self.name))
     time.sleep(10)
     util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(self.name, self.processor))
@@ -245,13 +244,9 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
   def setup(self):
     LinuxContainer.setup(self)
     LinuxContainer.execute_command(self, 'apt-get install -y memcached')
-    # self.execute_command('/etc/init.d/memcached stop')
-    # TODO: Do I need a config?
-    # self.execute_command('sudo truncate -s0 /etc/memcached.conf')
     util.tmux_command(self.tmux_name, 'lxc-attach -n {0:s}'.format(self.name))
     time.sleep(1)
     util.tmux_command(self.tmux_name, Memcached.start_command(self, self.ip()))
-    # util.shell_call("sudo lxc-cgroup -n {0:s} memory.limit_in_bytes 1G".format(self.name))
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
@@ -375,6 +370,8 @@ def get_benchmark_processor(test):
     return util.virtual_processor(0)
   elif ('different-core' in test):
     return util.processor(1)
+  elif ('bare' in test):
+    return -1
   else:
     raise Exception('container.get_processor: Not implemented')
 
@@ -404,26 +401,32 @@ def setup_containers(args):
     raise Exception('not implemented yet')
   else:
     p = get_benchmark_processor(args.test)
+    b = None
     if args.container == 'linux':
       m = MemcachedLinuxContainer(util.processor(0))
-      b = BenchmarkLinuxContainer(args.metric, args.intensity, args.application, p)
+      if p != -1:
+        b = BenchmarkLinuxContainer(args.metric, args.intensity, args.application, p)
     elif args.container == 'docker':
       m = MemcachedDockerContainer(util.processor(0))
-      b = BenchmarkDockerContainer(args.metric, args.intensity, args.application, p)
+      if p != -1:
+        b = BenchmarkDockerContainer(args.metric, args.intensity, args.application, p)
     elif args.container == 'xcontainer':
       m = MemcachedXContainer(util.processor(0))
-      b = BenchmarkXContainer(args.metric, args.intensity, args.application, p)
+      if p != -1:
+        b = BenchmarkXContainer(args.metric, args.intensity, args.application, p)
 
     if args.destroy:
       m.destroy()
-      b.destroy()
+      if b is not None:
+        b.destroy()
     else:
       m.start()
       m.setup()
 
-      b.start()
-      b.setup()
-      b.benchmark()
+      if b is not None:
+        b.start()
+        b.setup()
+        b.benchmark()
 
 
 def main():

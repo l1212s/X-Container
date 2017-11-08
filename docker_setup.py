@@ -91,6 +91,7 @@ def check_last_run(args):
     if ('BENCHMARK TEST: {0:s}\n'.format(args.test) in lines) or ('BENCHMARK TEST:' not in lines and args.test == 'bare'):
       if "NOTE: " not in lines:
         raise Exception("Need to add a note to {0:s} to explain why this needs to be rerun".format(filename))
+      return
 
 
 def create_readme(args, folder):

@@ -4,7 +4,7 @@ import re
 import util
 
 NUM_CLIENTS = re.compile('NUM CLIENTS: ([0-9]+)')
-BENCHMARK_TEST = re.compile('BENCHMARK TEST: ([a-z\-]+)')
+BENCHMARK_TEST = re.compile('BENCHMARK TEST: (.*)')
 
 def correct_num_clients(output, expected_num_clients):
   m = re.search(NUM_CLIENTS, output)

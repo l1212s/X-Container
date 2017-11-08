@@ -33,7 +33,7 @@ def title(name, process, instances, benchmark):
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
-  parser.add_argument('-b', '--benchmark', help='Type of benchmark test (bare, CPU)')
+  parser.add_argument('-t', '--test', help='Type of test (bare, CPU)')
   parser.add_argument('-d', '--docker', required=True, help='Docker folder to use')
   parser.add_argument('-l', '--linux', required=True, help='Linux folder to use')
   parser.add_argument('-m', '--metric', required=True, help='Metric to graph')
@@ -77,9 +77,9 @@ def create_graph(args):
     )
     data.append(trace)
 
-  layout = dict(title = title(mm['name'], args.process, args.instances, args.benchmark), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
+  layout = dict(title = title(mm['name'], args.process, args.instances, args.test), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
   fig = dict(data=data, layout=layout)
-  filename = '{0:s}-{1:s}-b{2:d}-i{3:d}-x{4:s}-d{5:s}-l{6:s}'.format(args.process, args.metric, args.benchmark, args.instances, args.xcontainer, args.docker, args.linux)
+  filename = '{0:s}-{1:s}-t-{2:s}-i{3:d}'.format(args.process, args.metric, args.test, args.instances)
   py.plot(fig, filename=filename)
 
 def main():

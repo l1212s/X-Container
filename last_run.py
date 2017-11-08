@@ -35,7 +35,7 @@ def last_run(args):
     if not correct_num_clients(output, args.num_clients):
       continue
 
-    if not correct_benchmark(output, args.benchmark):
+    if not correct_benchmark(output, args.test):
       continue
     
     print(readme_file)    
@@ -46,7 +46,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--container', required=True, help='Container to find')
   parser.add_argument('-p', '--process', required=True, help='Application to find')
-  parser.add_argument('-b', '--benchmark', required=True, help='Benchmark to find')
+  parser.add_argument('-t', '--test', required=True, help='Test to find')
   parser.add_argument('-n', '--num_clients', type=int, default=1, help='Number of clients or cores to find')
   args = parser.parse_args()
   util.check_benchmark(args)

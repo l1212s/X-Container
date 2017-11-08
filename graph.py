@@ -32,14 +32,22 @@ def title(name, process, instances, benchmark):
   else:
     return n 
 
-def fetch_points(process, container, date, metric):
-  folder = util.instance_folder(util.container_folder(process, container), date)
-  f = open('{0:s}/{1:s}.csv'.format(folder, metric))
+def fetch_points(process, container, dates, metric):
+  container_folder = util.container_folder(process, container)
+  instance_folders = map(lambda d: util.instance_folder(container_folder, d), dates)
+  files = map(lambda i: open('{0:s}/{1:s}.csv'.format(i, metric)), instance_folders)
+  lines = map(lambda f: f.readlines(), files)
+  num_lines = len(lines[0])
   points = []
-  for line in f.readlines():
-    line = line.strip()
-    [x,y] = line.split(',')
-    points.append((x,y))
+
+  for i in range(num_lines):
+    total = 0.0
+    x = 0
+    for l in lines:
+      line = l[i].strip()
+      [x,y] = line.split(',')
+      total += float(y)
+    points.append((x, total / float(len(dates))))
   points = sorted(points, key=lambda point: point[0])
   return points
 
@@ -49,7 +57,7 @@ def create_json_graph(args):
   with open('json/{0:s}'.format(args.json)) as f:
     traces = json.load(f)
   for trace in traces['traces']:
-    points = fetch_points(trace['process'], trace['container'], trace['date'], args.metric)
+    points = fetch_points(trace['process'], trace['container'], trace['dates'], args.metric)
     
     xs = map(lambda p: p[0], points)
     ys = map(lambda p: p[1], points)
@@ -74,7 +82,7 @@ def create_container_graph(args):
 
   for container in CONTAINERS:
     date = getattr(args, container)
-    points = fetch_points(args.process, container, date, args.metric)
+    points = fetch_points(args.process, container, [date], args.metric)
 
     xs = map(lambda p: p[0], points)
     ys = map(lambda p: p[1], points)

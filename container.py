@@ -181,9 +181,6 @@ class XContainer(DockerContainer):
     util.tmux_command(self.tmux_name, 'cd /root/experiments/native/compute06/docker')
     util.tmux_command(self.tmux_name, 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(DockerContainer.id(self), self.ip(), self.name))
     time.sleep(10)
-    util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(self.name, self.processor))
-    util.shell_call('python /root/x-container/irq-balance.py')
-    util.shell_call('python /root/x-container/cpu-balance.py')
 
 
 class ApplicationContainer(Container):
@@ -419,7 +416,7 @@ def setup_containers(args):
       m.destroy()
       if b is not None:
         b.destroy()
-    else:
+    else: 
       m.start()
       m.setup()
 
@@ -427,6 +424,13 @@ def setup_containers(args):
         b.start()
         b.setup()
         b.benchmark()
+
+      if args.container == 'xcontainer':
+        util.shell_call('python /root/x-container/irq-balance.py')
+        util.shell_call('python /root/x-container/cpu-balance.py')
+        util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(m.name, m.processor), True)
+        if b is not None:
+          util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(b.name, b.processor), True)
 
 
 def main():

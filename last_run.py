@@ -26,6 +26,7 @@ def last_run(args):
   runs = util.shell_output('ls {0:s}'.format(container_folder)).strip().split('\n')
   runs.sort(reverse=True)
 
+  i = 0
   for run in runs:
     readme_file = '{0:s}/{1:s}/README'.format(container_folder, run)
     if not os.path.isfile(readme_file):
@@ -40,7 +41,9 @@ def last_run(args):
     
     print(readme_file)    
     print(output)
-    return
+    i += 1
+    if i == args.instances:
+      return
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
@@ -48,6 +51,7 @@ def parse_arguments():
   parser.add_argument('-p', '--process', required=True, help='Application to find')
   parser.add_argument('-t', '--test', required=True, help='Test to find')
   parser.add_argument('-n', '--num_clients', type=int, default=1, help='Number of clients or cores to find')
+  parser.add_argument('-i', '--instances', type=int, default=1, help='Number of runs to return')
   args = parser.parse_args()
   util.check_benchmark(args)
   return args

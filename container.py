@@ -247,7 +247,7 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
     LinuxContainer.execute_command(self, 'apt-get install -y memcached')
     util.tmux_command(self.tmux_name, 'lxc-attach -n {0:s}'.format(self.name))
     time.sleep(1)
-    util.tmux_command(self.tmux_name, Memcached.start_command(self, self.ip()))
+    util.tmux_command(self.tmux_name, "taskset -c {0:d} {1:s}".format(self.processor, Memcached.start_command(self, self.ip())))
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
@@ -270,11 +270,11 @@ class BenchmarkContainer(Container):
     util.tmux_command(self.tmux_name, 'apt-get install -y git')
     time.sleep(30)
     util.tmux_command(self.tmux_name, 'apt-get install -y make')
-    time.sleep(30)
+    time.sleep(20)
     util.tmux_command(self.tmux_name, 'apt-get install -y ca-certificates')
-    time.sleep(30)
+    time.sleep(20)
     util.tmux_command(self.tmux_name, 'apt-get install -y g++')
-    time.sleep(60)
+    time.sleep(30)
     util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
     util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; make')
     time.sleep(30)
@@ -287,7 +287,7 @@ class BenchmarkContainer(Container):
       args = '{0:d}'.format(self.duration)
     else:
       raise Exception('benchmark - not implemented')
-    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
+    util.tmux_command(self.tmux_name, 'taskset -c {0:d} /home/XcontainerBolt/uBench/src/{1:s} {2:s}'.format(self.processor, self.metric, args))
 
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))

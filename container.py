@@ -283,7 +283,7 @@ class BenchmarkContainer(Container):
       args = '{0:d}'.format(self.duration)
     else:
       raise Exception('benchmark - not implemented')
-    util.tmux_command(self.tmux_name, 'home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
+    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
 
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
@@ -416,7 +416,7 @@ def setup_containers(args):
       m.destroy()
       if b is not None:
         b.destroy()
-    else: 
+    else:
       m.start()
       m.setup()
 

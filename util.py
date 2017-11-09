@@ -1,8 +1,12 @@
 import os
 import subprocess
 
-START_PROCESSOR = 18
-START_VIRTUAL_PROCESSOR = 19
+APPLICATION_CPU = 10  # (Bound to Core 10, Socket 0, NUMA 0)
+APPLICATION_MEM = 0
+VIRTUAL_CPU = 22  # (Bound to Core 10, Socket 0, NUMA 0)
+VIRTUAL_MEM = 0
+DIFFERENT_CPU = 11  # (Bound to Core 11, Socket 1, NUMA 1)
+DIFFERENT_MEM = 1
 
 
 def shell_call(command, show_command=False):
@@ -60,19 +64,26 @@ def check_benchmark(args):
     raise Exception('Invalid benchmark {0:s}. Choose from the following:\n{1:s}'.format(args.test, '\n'.join(benchmark_tests)))
 
 
-def processor(i):
-  return START_PROCESSOR + 2*i
+def cpu(v='default'):
+  if v == 'default':
+    return APPLICATION_CPU
+  elif v == 'virtual':
+    return VIRTUAL_CPU
+  elif v == 'different':
+    return DIFFERENT_CPU
+  else:
+    raise Exception('cpu - not implemented')
 
 
-def physical_processors(n):
-  processors = []
-  for i in range(n):
-    processors.append(processor(i))
-  return processors
-
-
-def virtual_processor(i):
-  return START_VIRTUAL_PROCESSOR + 2*i
+def memory(v='default'):
+  if v == 'default':
+    return APPLICATION_MEM
+  elif v == 'virtual':
+    return VIRTUAL_MEM
+  elif v == 'different':
+    return DIFFERENT_MEM
+  else:
+    raise Exception('mem - not implemented')
 
 
 def tmux_command(session, command):

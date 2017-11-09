@@ -17,11 +17,12 @@ class Memcached(object):
 
 
 class Container(object):
-  def __init__(self, name, container, application, processor):
+  def __init__(self, name, container, application, processor_type):
     self.application = application
     self.container = container
     self.name = name
-    self.processor = processor
+    self.processor = util.cpu(processor_type)
+    self.mem = util.mem(processor_type)
 
   def name(self):
     return self.name
@@ -46,7 +47,7 @@ class Container(object):
 
 
 class LinuxContainer(Container):
-  def __init__(self, name, application, processor):
+  def __init__(self, name, application, processor='default'):
     Container.__init__(self, name, 'linux', application, processor)
     self.tmux_name = 'linux'
 
@@ -54,6 +55,9 @@ class LinuxContainer(Container):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
     util.shell_call('lxc-stop --name {0:s}'.format(self.name))
     util.shell_call('lxc-destroy --name {0:s}'.format(self.name))
+
+  def snapshot_name(self):
+    return 'snapshot_{0:s}'.format(self.name)
 
   def execute_command(self, command):
     util.shell_call('lxc-attach --name {0:s} -- /bin/sh -c "{1:s}"'.format(self.name, command), True)
@@ -86,7 +90,7 @@ DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 
 
 class DockerContainer(Container):
-  def __init__(self, name, application, processor):
+  def __init__(self, name, application, processor='default'):
     print('DC - init ', name)
     Container.__init__(self, name, 'docker', application, processor)
 
@@ -144,7 +148,7 @@ class DockerContainer(Container):
 
 
 class XContainer(DockerContainer):
-  def __init__(self, name, application, processor, ip_offset):
+  def __init__(self, name, application, ip_offset, processor='default'):
     Container.__init__(self, name, 'xcontainer', application, processor)
     self.tmux_name = '{0:s}_xcontainer'.format(name)
     self.ip_offset = ip_offset
@@ -206,8 +210,8 @@ class ApplicationContainer(Container):
 
 
 class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached):
-  def __init__(self, processor):
-    DockerContainer.__init__(self, 'memcached_container', 'memcached', processor)
+  def __init__(self):
+    DockerContainer.__init__(self, 'memcached_container', 'memcached')
 
   def config(self):
     return ""
@@ -225,8 +229,8 @@ class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached)
 
 
 class MemcachedXContainer(XContainer, MemcachedDockerContainer):
-  def __init__(self, processor):
-    XContainer.__init__(self, 'memcached_container', 'memcached', processor, 1)
+  def __init__(self):
+    XContainer.__init__(self, 'memcached_container', 'memcached', 1)
 
   def setup(self):
     XContainer.setup(self)
@@ -235,8 +239,8 @@ class MemcachedXContainer(XContainer, MemcachedDockerContainer):
 
 
 class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
-  def __init__(self, processor):
-    LinuxContainer.__init__(self, 'memcached_container', 'memcached', processor)
+  def __init__(self):
+    LinuxContainer.__init__(self, 'memcached_container', 'memcached')
 
   def setup(self):
     LinuxContainer.setup(self)
@@ -344,7 +348,7 @@ class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContain
 
   def setup(self):
     BenchmarkContainer.setup(self)
-    util.shell_call('sudo docker stop {0:s}'.format(self.name)) # TODO: Replace
+    util.shell_call('sudo docker stop {0:s}'.format(self.name))  # TODO: Replace
     time.sleep(5)
     XContainer.setup(self)
     time.sleep(10)
@@ -362,15 +366,15 @@ class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContain
 
 def get_benchmark_processor(test):
   if ('same-container' in test) or ('same-core' in test):
-    return util.processor(0)
+    return 'default'
   elif ('different-logical-core' in test):
-    return util.virtual_processor(0)
+    return 'logical'
   elif ('different-core' in test):
-    return util.processor(1)
+    return 'different'
   elif ('bare' in test):
-    return -1
+    return ''
   else:
-    raise Exception('container.get_processor: Not implemented')
+    raise Exception('container.get_benchmark_processor: Not implemented')
 
 
 def parse_arguments():
@@ -393,24 +397,46 @@ def parse_arguments():
   return args
 
 
+def balance_xcontainer(b, m):
+  util.shell_call('python /root/x-container/irq-balance.py')
+  util.shell_call('python /root/x-container/cpu-balance.py')
+  util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(m.name, m.processor), True)
+  if b is not None:
+    util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(b.name, b.processor), True)
+
+
+def create_application_container(args):
+  if args.container == 'linux':
+    m = MemcachedLinuxContainer()
+  elif args.container == 'docker':
+    m = MemcachedDockerContainer()
+  elif args.container == 'xcontainer':
+    m = MemcachedXContainer()
+  else:
+    raise Exception("create_application_container: not implemented")
+  return m
+
+
+def create_benchmark_container(args):
+  p = get_benchmark_processor(args.test)
+  b = None
+
+  if p != '':
+    if args.container == 'linux':
+      b = BenchmarkLinuxContainer(args.metric, args.intensity, args.application, p)
+    elif args.container == 'docker':
+      b = BenchmarkDockerContainer(args.metric, args.intensity, args.application, p)
+    elif args.container == 'xcontainer':
+      b = BenchmarkXContainer(args.metric, args.intensity, args.application, p)
+  return b
+
+
 def setup_containers(args):
   if 'same-container' in args.test:
     raise Exception('not implemented yet')
   else:
-    p = get_benchmark_processor(args.test)
-    b = None
-    if args.container == 'linux':
-      m = MemcachedLinuxContainer(util.processor(0))
-      if p != -1:
-        b = BenchmarkLinuxContainer(args.metric, args.intensity, args.application, p)
-    elif args.container == 'docker':
-      m = MemcachedDockerContainer(util.processor(0))
-      if p != -1:
-        b = BenchmarkDockerContainer(args.metric, args.intensity, args.application, p)
-    elif args.container == 'xcontainer':
-      m = MemcachedXContainer(util.processor(0))
-      if p != -1:
-        b = BenchmarkXContainer(args.metric, args.intensity, args.application, p)
+    m = create_application_container(args)
+    b = create_benchmark_container(args)
 
     if args.destroy:
       m.destroy()
@@ -426,11 +452,7 @@ def setup_containers(args):
         b.benchmark()
 
       if args.container == 'xcontainer':
-        util.shell_call('python /root/x-container/irq-balance.py')
-        util.shell_call('python /root/x-container/cpu-balance.py')
-        util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(m.name, m.processor), True)
-        if b is not None:
-          util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(b.name, b.processor), True)
+        balance_xcontainer(b, m)
 
 
 def main():

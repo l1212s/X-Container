@@ -78,6 +78,11 @@ def cpu(v='default'):
 def processor(i):
   return 18 + 2*i
 
+def physical_processors(n):
+  processors = []
+  for i in range(n):
+    processors.append(processor(i))
+  return processors
 
 def memory(v='default'):
   if v == 'default':

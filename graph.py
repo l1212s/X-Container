@@ -72,7 +72,7 @@ def create_json_graph(args):
 
   layout = dict(title = '{0:s} ({1:s})'.format(traces['title'], args.metric), xaxis = dict(title = mm['x-axis']), yaxis = dict(title = mm['y-axis']))
   fig = dict(data=data, layout=layout)
-  filename = args.json
+  filename = '{0:s}-{1:s}'.format(args.metric, args.json)
   py.plot(fig, filename=filename)
 
 def create_container_graph(args):

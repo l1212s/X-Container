@@ -75,6 +75,10 @@ def cpu(v='default'):
     raise Exception('cpu - not implemented')
 
 
+def processor(i):
+  return 18 + 2*i
+
+
 def memory(v='default'):
   if v == 'default':
     return APPLICATION_MEM

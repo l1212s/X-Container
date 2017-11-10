@@ -22,7 +22,7 @@ class Container(object):
     self.container = container
     self.name = name
     self.processor = util.cpu(processor_type)
-    self.mem = util.mem(processor_type)
+    self.mem = util.memory(processor_type)
 
   def name(self):
     return self.name
@@ -56,9 +56,6 @@ class LinuxContainer(Container):
     util.shell_call('lxc-stop --name {0:s}'.format(self.name))
     util.shell_call('lxc-destroy --name {0:s}'.format(self.name))
 
-  def snapshot_name(self):
-    return 'snapshot_{0:s}'.format(self.name)
-
   def execute_command(self, command):
     util.shell_call('lxc-attach --name {0:s} -- /bin/sh -c "{1:s}"'.format(self.name, command), True)
 
@@ -77,7 +74,8 @@ class LinuxContainer(Container):
   def start(self):
     util.shell_call('lxc-create --name {0:s} -t ubuntu'.format(self.name), True)
     util.shell_call('lxc-start --name {0:s} -d'.format(self.name), True)
-    util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
+    util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor), True)
+    util.shell_call("lxc-cgroup -n {0:s} cpuset.mems {1:d}".format(self.name, self.mem), True)
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name), True)
     # Need to sleep to let container establish network connection
     time.sleep(5)
@@ -91,7 +89,6 @@ DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 
 class DockerContainer(Container):
   def __init__(self, name, application, processor='default'):
-    print('DC - init ', name)
     Container.__init__(self, name, 'docker', application, processor)
 
   def destroy(self):
@@ -123,8 +120,8 @@ class DockerContainer(Container):
   def bridge_ip(self):
     return util.get_ip_address('docker0')
 
-  def cpu(self):
-    return '-P --cpuset-cpus={0:d}'.format(self.processor)
+  def cpuset(self):
+    return '-P --cpuset-cpus={0:d} --cpuset-mems={1:d}'.format(self.processor, self.mem)
 
   def id(self):
     return util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(self.name)).strip()
@@ -139,7 +136,7 @@ class DockerContainer(Container):
     if self.ports() != '':
       p = '-p {0:s}'.format(self.ports())
 
-    util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, self.cpu(), v, p, self.application, self.args()))
+    util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, self.cpuset(), v, p, self.application, self.args()), True)
     time.sleep(5)
 
   def setup(self):
@@ -158,7 +155,7 @@ class XContainer(DockerContainer):
     DockerContainer.destroy(self)
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
 
-  def cpu(self):
+  def cpuset(self):
     return ''
 
   def bridge_ip(self):
@@ -247,7 +244,8 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
     LinuxContainer.execute_command(self, 'apt-get install -y memcached')
     util.tmux_command(self.tmux_name, 'lxc-attach -n {0:s}'.format(self.name))
     time.sleep(1)
-    util.tmux_command(self.tmux_name, "taskset -c {0:d} {1:s}".format(self.processor, Memcached.start_command(self, self.ip())))
+    util.tmux_command(self.tmux_name, Memcached.start_command(self, self.ip()))
+    time.sleep(1)
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
@@ -266,18 +264,19 @@ class BenchmarkContainer(Container):
 
   def setup(self):
     util.tmux_command(self.tmux_name, 'apt-get update')
-    time.sleep(30)
+    time.sleep(5)
     util.tmux_command(self.tmux_name, 'apt-get install -y git')
-    time.sleep(30)
+    time.sleep(40)
     util.tmux_command(self.tmux_name, 'apt-get install -y make')
-    time.sleep(20)
+    time.sleep(5)
     util.tmux_command(self.tmux_name, 'apt-get install -y ca-certificates')
-    time.sleep(20)
+    time.sleep(8)
     util.tmux_command(self.tmux_name, 'apt-get install -y g++')
-    time.sleep(30)
+    time.sleep(90)
     util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+    time.sleep(8)
     util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; make')
-    time.sleep(30)
+    time.sleep(10)
 
   def benchmark(self):
     args = ''
@@ -287,7 +286,7 @@ class BenchmarkContainer(Container):
       args = '{0:d}'.format(self.duration)
     else:
       raise Exception('benchmark - not implemented')
-    util.tmux_command(self.tmux_name, 'taskset -c {0:d} /home/XcontainerBolt/uBench/src/{1:s} {2:s}'.format(self.processor, self.metric, args))
+    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
 
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
@@ -301,6 +300,8 @@ class BenchmarkLinuxContainer(LinuxContainer, BenchmarkContainer):
 
   def setup(self):
     LinuxContainer.setup(self)
+    util.tmux_command(self.tmux_name, 'lxc-attach --name {0:s}'.format(self.name))
+    time.sleep(2)
     BenchmarkContainer.setup(self)
 
   def destroy(self):
@@ -314,6 +315,7 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
     BenchmarkContainer.__init__(self, metric, intensity, name, container, application, processor)
 
   def setup(self):
+    time.sleep(1)
     DockerContainer.setup(self)
     BenchmarkContainer.setup(self)
 
@@ -330,14 +332,13 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
   def ports(self):
     return ''
 
-  def cpu(self):
-    return '--cpuset-cpus={0:d}'.format(self.processor)
-
   def start(self):
     BenchmarkContainer.start(self)
-    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpu()))
-    print('docker start')
-    time.sleep(5)
+    print("STARTED")
+    time.sleep(10)
+    print("1")
+    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpuset()))
+    print("2")
 
 
 class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContainer):

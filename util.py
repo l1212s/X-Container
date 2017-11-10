@@ -3,8 +3,8 @@ import subprocess
 
 APPLICATION_CPU = 10  # (Bound to Core 10, Socket 0, NUMA 0)
 APPLICATION_MEM = 0
-VIRTUAL_CPU = 22  # (Bound to Core 10, Socket 0, NUMA 0)
-VIRTUAL_MEM = 0
+LOGICAL_CPU = 22  # (Bound to Core 10, Socket 0, NUMA 0)
+LOGICAL_MEM = 0
 DIFFERENT_CPU = 11  # (Bound to Core 11, Socket 1, NUMA 1)
 DIFFERENT_MEM = 1
 
@@ -67,8 +67,8 @@ def check_benchmark(args):
 def cpu(v='default'):
   if v == 'default':
     return APPLICATION_CPU
-  elif v == 'virtual':
-    return VIRTUAL_CPU
+  elif v == 'logical':
+    return LOGICAL_CPU
   elif v == 'different':
     return DIFFERENT_CPU
   else:
@@ -78,25 +78,32 @@ def cpu(v='default'):
 def processor(i):
   return 18 + 2*i
 
+
 def physical_processors(n):
   processors = []
   for i in range(n):
     processors.append(processor(i))
   return processors
 
+
 def memory(v='default'):
   if v == 'default':
     return APPLICATION_MEM
-  elif v == 'virtual':
-    return VIRTUAL_MEM
+  elif v == 'logical':
+    return LOGICAL_MEM
   elif v == 'different':
     return DIFFERENT_MEM
   else:
     raise Exception('mem - not implemented')
 
 
-def tmux_command(session, command):
-  shell_call('tmux send -t {0:s} "{1:s}" C-m'.format(session, command))
+def tmux_command(session, command, wait=False):
+  prefix_wait_command = ''
+  postfix_wait_command = ''
+  if wait:
+    prefix_wait_command = '; tmux wait-for -S command'
+    postfix_wait_command = '\; wait-for command'
+  shell_call('tmux send-keys -t {0:s} "{1:s}{2:s}" C-m{3:s}'.format(session, command, prefix_wait_command, postfix_wait_command))
 
 
 def get_ip_address(name):

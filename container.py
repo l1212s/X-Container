@@ -334,17 +334,14 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
 
   def start(self):
     BenchmarkContainer.start(self)
-    print("STARTED")
     time.sleep(10)
-    print("1")
     util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpuset()))
-    print("2")
 
 
 class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContainer):
   def __init__(self, metric, intensity, application, processor):
     name = 'benchmark_xcontainer'
-    XContainer.__init__(self, name, 'bash', processor, 2)
+    XContainer.__init__(self, name, 'bash', 2, processor)
     BenchmarkDockerContainer.__init__(self, metric, intensity, application, processor, name, 'xcontainer')
 
   def setup(self):
@@ -398,11 +395,15 @@ def parse_arguments():
   return args
 
 
-def balance_xcontainer(b, m):
+def balance_xcontainer(b, m, p):
   util.shell_call('python /root/x-container/irq-balance.py')
-  util.shell_call('python /root/x-container/cpu-balance.py')
+  util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(m.name))
   util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(m.name, m.processor), True)
   if b is not None:
+    if p == 'logical':
+      util.shell_call('xl cpupool-migrate {0:s} Pool-node1'.format(b.name), True)
+    else:
+      util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(b.name), True)
     util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(b.name, b.processor), True)
 
 
@@ -433,6 +434,8 @@ def create_benchmark_container(args):
 
 
 def setup_containers(args):
+  if args.container == 'xcontainer':
+    util.shell_call('xl cpupool-numa-split')
   if 'same-container' in args.test:
     raise Exception('not implemented yet')
   else:
@@ -453,7 +456,7 @@ def setup_containers(args):
         b.benchmark()
 
       if args.container == 'xcontainer':
-        balance_xcontainer(b, m)
+        balance_xcontainer(b, m, get_benchmark_processor(args.test))
 
 
 def main():

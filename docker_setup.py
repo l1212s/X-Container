@@ -274,7 +274,6 @@ NOT_AVAILABLE = re.compile("N/A")
 
 
 def save_benchmark_results(instance_folder, file_names, results):
-  raise Exception("omg out of date")
   files = map(lambda f: open("{0:s}/{1:s}.csv".format(instance_folder, f), "w+"), file_names)
 
   for result in results:
@@ -296,14 +295,14 @@ def save_benchmark_results(instance_folder, file_names, results):
             print("exception")
         break
 
-#      try:
-#        fmeasurement = float(measurement)
+      try:
+        fmeasurement = float(measurement)
 #        if measurement == str(fmeasurement):
-#          files[i].write("{0:f},{1:d},{2:0.2f}\n".format(float(rate), core, fmeasurement))
+        files[i].write("{0:f},{1:0.2f}\n".format(float(rate), fmeasurement))
 #        else:
 #          files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
-#      except Exception:
-#        files[i].write("{0:f},{1:d},{2:s}\n".format(float(rate), core, str(measurement)))
+      except Exception:
+        files[i].write("{0:f},{1:s}\n".format(float(rate), str(measurement)))
 
 
 def get_rates(args):

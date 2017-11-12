@@ -15,6 +15,8 @@ class Memcached(object):
       addr = '-l {0:s}'.format(ip)
     return 'memcached -m {0:d} -u root -p {1:d} {2:s} -t {3:d}'.format(self.size, self.port, addr, self.threads)
 
+class Nginx(object):
+  port = 80
 
 class Container(object):
   def __init__(self, name, container, application, processor_type):
@@ -127,7 +129,6 @@ class DockerContainer(Container):
     return util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(self.name)).strip()
 
   def start(self):
-    # TODO: X-Container
     v = ''
     if self.config() != '':
       v = '-v {0:s}'.format(self.config())
@@ -225,6 +226,65 @@ class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached)
     ApplicationContainer.benchmark_message(self)
 
 
+def get_nginx_configuration():
+  return '''
+user  www-data;
+worker_processes  1;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    access_log  off;
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        off; # disable to avoid caching and volume mount issues
+
+    keepalive_timeout  120;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+'''
+
+
+def setup_nginx_configuration(configuration_file_path):
+  f = open(configuration_file_path, 'w')
+  f.write(get_nginx_configuration())
+  f.close
+
+
+class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx):
+  def __init__(self):
+    self.config_file = '/dev/nginx.conf'
+    DockerContainer.__init__(self, 'nginx_container', 'nginx')
+
+  def config(self):
+    return '{0:s}:/etc/nginx/nginx.conf:ro'.format(self.config_file)
+
+  def ports(self):
+    return ''
+
+  def ports(self):
+    return '0.0.0.0:{0:d}:{0:d}'.format(self.port)
+
+  def args(self):
+    return ''
+
+  def start(self):
+    #setup_nginx_configuration(self.config_file)
+    DockerContainer.start(self) 
+
+  def setup(self):
+    DockerContainer.setup(self)
+    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+    ApplicationContainer.benchmark_message(self)
+
+
 class MemcachedXContainer(XContainer, MemcachedDockerContainer):
   def __init__(self):
     XContainer.__init__(self, 'memcached_container', 'memcached', 1)
@@ -233,6 +293,18 @@ class MemcachedXContainer(XContainer, MemcachedDockerContainer):
     XContainer.setup(self)
     MemcachedDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     MemcachedDockerContainer.benchmark_message(self)
+
+
+class NginxXContainer(XContainer, NginxDockerContainer):
+  def __init__(self):
+    NginxDockerContainer.__init__(self)
+    #setup_nginx_configuration(self.config_file)
+    XContainer.__init__(self, 'nginx_container', 'nginx', 1)
+
+  def setup(self):
+    XContainer.setup(self)
+    NginxDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+    NginxDockerContainer.benchmark_message(self)
 
 
 class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
@@ -272,7 +344,7 @@ class BenchmarkContainer(Container):
     util.tmux_command(self.tmux_name, 'apt-get install -y ca-certificates')
     time.sleep(8)
     util.tmux_command(self.tmux_name, 'apt-get install -y g++')
-    time.sleep(90)
+    time.sleep(100)
     util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
     time.sleep(8)
     util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; make')
@@ -409,11 +481,20 @@ def balance_xcontainer(b, m, p):
 
 def create_application_container(args):
   if args.container == 'linux':
-    m = MemcachedLinuxContainer()
+    if args.application == 'memcached':
+      m = MemcachedLinuxContainer()
+    else:
+      raise Exception("not implemented")
   elif args.container == 'docker':
-    m = MemcachedDockerContainer()
+    if args.application == 'memcached':
+      m = MemcachedDockerContainer()
+    else:
+      m = NginxDockerContainer()
   elif args.container == 'xcontainer':
-    m = MemcachedXContainer()
+    if args.application == 'memcached':
+      m = MemcachedXContainer()
+    else:
+      m = NginxXContainer()
   else:
     raise Exception("create_application_container: not implemented")
   return m

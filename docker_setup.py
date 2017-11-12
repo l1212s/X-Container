@@ -310,7 +310,7 @@ def get_rates(args):
 
   def r(x, y): return range(x * num_connections, y * num_connections, x * num_connections)
   if args.process == "nginx":
-    rates = r(5, 500)
+    rates = r(10, 500)
   elif args.process == "memcached":
     rates = r(150, 5400)
   else:

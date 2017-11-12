@@ -285,7 +285,6 @@ def save_benchmark_results(instance_folder, file_names, results):
         files[i].write("{0:d},N/A\n".format(rate))
         continue
       for regex in [(0.001, NANOSECONDS_REGEX), (1, MILLISECONDS_REGEX), (1000, SECONDS_REGEX), (60*1000, MINUTE_REGEX)]:
-        print("measurement", measurement)
         m = regex[1].match(measurement)
         if m is not None:
           measurement = m.group(1)

@@ -151,6 +151,42 @@ class XContainer(DockerContainer):
     self.tmux_name = '{0:s}_xcontainer'.format(name)
     self.ip_offset = ip_offset
 
+  def xconfig(self):
+    return """
+builder='hvm'
+serial='pty'
+
+#kernel = "/root/ubuntu16/kernel/vmlinuz-4.4.44"
+#ramdisk = "/root/ubuntu/initrd.img-3.19.8-xenct"
+#ramdisk = "/root/ubuntu16/initrd/initrd.img-4.4.44.new"
+#extra = "docker root=/dev/xvda rw noplymouth noresume $vt_handoff earlyprintk=xen vsyscall=native console=hvc0 ip=::::VM_NAME:eth0:dhcp quiet"
+
+name = "VM_NAME"
+memory = "8192"
+#memory = 16000
+#disk = [ '/root/ubuntu/disk.qcow2,qcow2,xvda,rw', '/dev/mapper/test,raw,xvdb,rw']
+disk = [ '/root/experiments/native/compute06/docker/IMAGE_NAME,qcow2,xvda,rw', 'DEVICE_NAME,raw,xvdb,rw', "/root/experiments/native/compute06/docker/ISO_NAME,raw,xvdc:cdrom,r"]
+#disk = [ '/root/ubuntu/disk.img,raw,xvda,rw']
+vif = [ 'mac=MAC_ADDR,bridge=xenbr0,type=vif' ]
+vcpus = VM_CPU
+#cpus_soft = ["0", "1", "2", "3"]
+#vfb = [ 'type=vnc' ]
+vnc = 0
+nographic = 1
+on_reboot = 'restart'
+on_crash = 'preserve'
+#bootloader= 'pygrub'
+device_model_version = "qemu-xen"
+cpus="{0:d}"
+    """.format(self.processor)
+
+  def create_xconfig(self):
+    filename = '/root/experiments/native/compute06/docker/docker_hvm.cfg'
+    util.shell_call('truncate -s0 {0:s}'.format(filename))
+    f = open(filename, 'w+')
+    f.write(self.xconfig())    
+    f.close 
+
   def destroy(self):
     util.shell_call('xl destroy {0:s}'.format(self.name))
     DockerContainer.destroy(self)
@@ -180,6 +216,7 @@ class XContainer(DockerContainer):
   def setup(self):
     util.shell_call('docker stop {0:s}'.format(self.name))
     time.sleep(1)
+    self.create_xconfig()
     util.tmux_command(self.tmux_name, 'cd /root/experiments/native/compute06/docker')
     util.tmux_command(self.tmux_name, 'python run.py --id {0:s} --ip {1:s} --hvm --name {2:s} --cpu=1'.format(DockerContainer.id(self), self.ip(), self.name))
     time.sleep(10)
@@ -261,10 +298,12 @@ def setup_nginx_configuration(configuration_file_path):
 class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx):
   def __init__(self):
     self.config_file = '/dev/nginx.conf'
+    self.docker_tmux_name = 'nginx_docker'
+    util.shell_call('tmux new -s {0:s} -d'.format(self.docker_tmux_name))
     DockerContainer.__init__(self, 'nginx_container', 'nginx')
 
   def config(self):
-    return '{0:s}:/etc/nginx/nginx.conf:ro'.format(self.config_file)
+    return ''
 
   def ports(self):
     return ''
@@ -277,12 +316,24 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx):
 
   def start(self):
     #setup_nginx_configuration(self.config_file)
-    DockerContainer.start(self) 
+    DockerContainer.start(self)
+
+  def setup_config(self):
+    util.tmux_command(self.docker_tmux_name, 'docker exec -it {0:s} /bin/bash'.format(self.name))
+    util.tmux_command(self.docker_tmux_name, 'truncate -s0 etc/nginx/nginx.conf')
+    for line in get_nginx_configuration().split('\n'):
+      util.tmux_command(self.docker_tmux_name, "echo '{0:s}' >> etc/nginx/nginx.conf".format(line))
+    util.tmux_command(self.docker_tmux_name, 'exit')
 
   def setup(self):
     DockerContainer.setup(self)
+    self.setup_config()
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
+
+  def destroy(self):
+    DockerContainer.destroy(self)
+    util.shell_call('tmux kill-session -t {0:s}'.format(self.docker_tmux_name))
 
 
 class MemcachedXContainer(XContainer, MemcachedDockerContainer):
@@ -298,13 +349,17 @@ class MemcachedXContainer(XContainer, MemcachedDockerContainer):
 class NginxXContainer(XContainer, NginxDockerContainer):
   def __init__(self):
     NginxDockerContainer.__init__(self)
-    #setup_nginx_configuration(self.config_file)
     XContainer.__init__(self, 'nginx_container', 'nginx', 1)
 
   def setup(self):
+    NginxDockerContainer.setup_config(self)
     XContainer.setup(self)
     NginxDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     NginxDockerContainer.benchmark_message(self)
+
+  def destroy(self):
+    XContainer.destroy(self)
+    NginxDockerContainer.destroy(self)
 
 
 class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
@@ -515,8 +570,8 @@ def create_benchmark_container(args):
 
 
 def setup_containers(args):
-  if args.container == 'xcontainer':
-    util.shell_call('xl cpupool-numa-split')
+  #if args.container == 'xcontainer':
+  #  util.shell_call('xl cpupool-numa-split')
   if 'same-container' in args.test:
     raise Exception('not implemented yet')
   else:
@@ -536,8 +591,8 @@ def setup_containers(args):
         b.setup()
         b.benchmark()
 
-      if args.container == 'xcontainer':
-        balance_xcontainer(b, m, get_benchmark_processor(args.test))
+      #if args.container == 'xcontainer':
+      #  balance_xcontainer(b, m, get_benchmark_processor(args.test))
 
 
 def main():

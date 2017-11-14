@@ -188,8 +188,8 @@ pool="Pool-node{0:d}"
     filename = '/root/experiments/native/compute06/docker/docker_hvm.cfg'
     util.shell_call('truncate -s0 {0:s}'.format(filename))
     f = open(filename, 'w+')
-    f.write(self.xconfig())    
-    f.close 
+    f.write(self.xconfig())
+    f.close
 
   def destroy(self):
     util.shell_call('xl destroy {0:s}'.format(self.name))
@@ -298,7 +298,7 @@ l2:
 #    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
 #    time.sleep(8)
 #    util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; truncate -s0 Makefile')
-#    for line in self.benchmark_makefile().split('\n'): 
+#    for line in self.benchmark_makefile().split('\n'):
 #      util.tmux_command(self.tmux_name, "echo -e '{0:s}' >> Makefile".format(line))
     if False:
       util.tmux_command(self.tmux_name, 'yum -y install libmpc-devel mpfr-devel gmp-devel')
@@ -429,6 +429,7 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     return ''
 
   def start(self):
+<<<<<<< e5bfe888a04525664148c019eba5c1d654cc9bc1
     #setup_nginx_configuration(self.config_file)
     DockerContainer.start(self)
 
@@ -442,6 +443,8 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
   def setup_benchmark(self):
     util.tmux_command(self.tmux_name, 'docker exec -it {0:s} /bin/bash'.format(self.name))
     BenchmarkContainer.setup(self, True)
+    #setup_nginx_configuration(self.config_file)
+    #DockerContainer.start(self)
 
   def setup(self):
     DockerContainer.setup(self)
@@ -477,7 +480,7 @@ class NginxXContainer(XContainer, NginxDockerContainer):
     NginxDockerContainer.setup_config(self)
     print("setup 2")
     if self.sameContainer:
-      NginxDockerContainer.setup_benchmark(self)  
+      NginxDockerContainer.setup_benchmark(self)
     print("setup 3")
     #util.shell_call("service docker restart")
     #XContainer.setup(self)
@@ -503,6 +506,21 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
     time.sleep(1)
     util.tmux_command(self.tmux_name, Memcached.start_command(self, self.ip()))
     time.sleep(1)
+    util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
+    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+    ApplicationContainer.benchmark_message(self)
+
+class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx):
+  def __init__(self):
+    LinuxContainer.__init__(self, 'memcached_container', 'memcached')
+
+  def setup(self):
+    LinuxContainer.setup(self)
+    LinuxContainer.execute_command(self, 'apt-get install -y nginx')
+    LinuxContainer.execute_command(self, 'truncate -s0 /etc/nginx/nginx.config')
+    for line in get_nginx_configuration().split("\n"):
+      LinuxContainer.execute_command(self, 'echo "{0:s}" >> /etc/nginx/nginx.config'.format(line))
+    LinuxContainer.execute_command(self, '/etc/init.d/nginx restart')
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
@@ -628,7 +646,7 @@ def create_application_container(args, sameContainer=False):
     if args.application == 'memcached':
       m = MemcachedLinuxContainer()
     else:
-      raise Exception("not implemented")
+      m = NginxLinuxContainer()
   elif args.container == 'docker':
     if args.application == 'memcached':
       m = MemcachedDockerContainer()
@@ -639,7 +657,7 @@ def create_application_container(args, sameContainer=False):
       m = MemcachedXContainer(sameContainer)
     else:
       if sameContainer:
-        m = NginxXContainer(sameContainer, args.metric, args.intensity) 
+        m = NginxXContainer(sameContainer, args.metric, args.intensity)
       else:
         m = NginxXContainer(sameContainer)
   else:

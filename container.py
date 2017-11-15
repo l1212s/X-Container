@@ -13,7 +13,7 @@ class Memcached(object):
     addr = ''
     if ip is not None:
       addr = '-l {0:s}'.format(ip)
-    return 'memcached -m {0:d} -u root -p {1:d} {2:s} -t {3:d}'.format(self.size, self.port, addr, self.threads)
+    return 'memcached -m {0:d} -u root -p {1:d} {2:s} -t {3:d} &'.format(self.size, self.port, addr, self.threads)
 
 class Nginx(object):
   port = 80
@@ -285,18 +285,18 @@ l2:
     if useYum:
       command = 'yum'
       install = 'yum -y install'
-#    util.tmux_command(self.tmux_name, '{0:s} update'.format(install))
-#    time.sleep(5)
-#    util.tmux_command(self.tmux_name, '{0:s} git'.format(install))
-#    time.sleep(40)
-#    util.tmux_command(self.tmux_name, '{0:s} make'.format(install))
-#    time.sleep(5)
-#    util.tmux_command(self.tmux_name, '{0:s} ca-certificates'.format(install))
-#    time.sleep(8)
-#    util.tmux_command(self.tmux_name, '{0:s} g++'.format(install))
-#    time.sleep(100)
-#    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
-#    time.sleep(8)
+    util.tmux_command(self.tmux_name, '{0:s} update'.format(command))
+    time.sleep(5)
+    util.tmux_command(self.tmux_name, '{0:s} git'.format(install))
+    time.sleep(40)
+    util.tmux_command(self.tmux_name, '{0:s} make'.format(install))
+    time.sleep(5)
+    util.tmux_command(self.tmux_name, '{0:s} ca-certificates'.format(install))
+    time.sleep(8)
+    util.tmux_command(self.tmux_name, '{0:s} g++'.format(install))
+    time.sleep(100)
+    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+    time.sleep(8)
 #    util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; truncate -s0 Makefile')
 #    for line in self.benchmark_makefile().split('\n'):
 #      util.tmux_command(self.tmux_name, "echo -e '{0:s}' >> Makefile".format(line))
@@ -326,7 +326,7 @@ l2:
       args = '{0:d}'.format(self.duration)
     else:
       raise Exception('benchmark - not implemented')
-    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s} &'.format(self.metric, args))
+    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
 
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
@@ -410,11 +410,14 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     self.config_file = '/dev/nginx.conf'
     self.docker_tmux_name = 'nginx_docker'
     util.shell_call('tmux new -s {0:s} -d'.format(self.docker_tmux_name))
+    util.shell_call('tmux new -s {0:s} -d'.format("benchmark"))
     DockerContainer.__init__(self, 'nginx_container', 'nginx')
     self.sameContainer = sameContainer
 
     if sameContainer:
+      print("same")
       BenchmarkContainer.__init__(self, metric, intensity, self.name, 'docker', 'nginx', 'default')
+
 
   def config(self):
     return ''
@@ -429,7 +432,6 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     return ''
 
   def start(self):
-<<<<<<< e5bfe888a04525664148c019eba5c1d654cc9bc1
     #setup_nginx_configuration(self.config_file)
     DockerContainer.start(self)
 
@@ -442,7 +444,7 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
 
   def setup_benchmark(self):
     util.tmux_command(self.tmux_name, 'docker exec -it {0:s} /bin/bash'.format(self.name))
-    BenchmarkContainer.setup(self, True)
+    BenchmarkContainer.setup(self, False)
     #setup_nginx_configuration(self.config_file)
     #DockerContainer.start(self)
 
@@ -451,12 +453,14 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     self.setup_config()
     if self.sameContainer:
       self.setup_benchmark()
+    print("setup 3")
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
 
   def destroy(self):
     DockerContainer.destroy(self)
     util.shell_call('tmux kill-session -t {0:s}'.format(self.docker_tmux_name))
+    util.shell_call('tmux kill-session -t {0:s}'.format("benchmark"))
 
 
 class MemcachedXContainer(XContainer, MemcachedDockerContainer):
@@ -495,9 +499,12 @@ class NginxXContainer(XContainer, NginxDockerContainer):
     NginxDockerContainer.destroy(self)
 
 
-class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
-  def __init__(self):
+class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached, BenchmarkContainer):
+  def __init__(self, sameContainer=False, metric=None, intensity=None):
+    self.sameContainer = sameContainer
     LinuxContainer.__init__(self, 'memcached_container', 'memcached')
+    if sameContainer:
+      BenchmarkContainer.__init__(self, metric, intensity, self.name, 'linux', 'memcached', 'default')
 
   def setup(self):
     LinuxContainer.setup(self)
@@ -507,12 +514,22 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached):
     util.tmux_command(self.tmux_name, Memcached.start_command(self, self.ip()))
     time.sleep(1)
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
+    if self.sameContainer:
+      BenchmarkContainer.setup(self, False)
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
 
-class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx):
-  def __init__(self):
-    LinuxContainer.__init__(self, 'memcached_container', 'memcached')
+class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, BenchmarkContainer):
+  def __init__(self, sameContainer=False, metric=None, intensity=None):
+    self.sameContainer = sameContainer
+    LinuxContainer.__init__(self, 'nginx_container', 'nginx')
+
+    if sameContainer:
+      BenchmarkContainer.__init__(self, metric, intensity, self.name, 'linux', 'nginx', 'default')
+
+  def setup_benchmark(self):
+    util.tmux_command(self.tmux_name, 'lxc-attach --name {0:s}'.format(self.name))
+    BenchmarkContainer.setup(self, False)
 
   def setup(self):
     LinuxContainer.setup(self)
@@ -522,6 +539,8 @@ class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx):
       LinuxContainer.execute_command(self, 'echo "{0:s}" >> /etc/nginx/nginx.config'.format(line))
     LinuxContainer.execute_command(self, '/etc/init.d/nginx restart')
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
+    if self.sameContainer:
+      BenchmarkContainer.setup(self, False)
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
 
@@ -644,14 +663,23 @@ def balance_xcontainer(b, m, p):
 def create_application_container(args, sameContainer=False):
   if args.container == 'linux':
     if args.application == 'memcached':
-      m = MemcachedLinuxContainer()
+      if sameContainer:
+        m = MemcachedLinuxContainer(sameContainer, args.metric, args.intensity)
+      else:
+        m = MemcachedLinuxContainer()
     else:
-      m = NginxLinuxContainer()
+      if sameContainer:
+        m = NginxLinuxContainer(sameContainer, args.metric, args.intensity)
+      else:
+        m = NginxLinuxContainer(sameContainer)
   elif args.container == 'docker':
     if args.application == 'memcached':
       m = MemcachedDockerContainer()
     else:
-      m = NginxDockerContainer()
+      if sameContainer:
+        m = NginxDockerContainer(sameContainer, args.metric, args.intensity)
+      else:
+        m = NginxDockerContainer(sameContainer)
   elif args.container == 'xcontainer':
     if args.application == 'memcached':
       m = MemcachedXContainer(sameContainer)

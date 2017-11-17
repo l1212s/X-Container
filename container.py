@@ -233,6 +233,7 @@ class BenchmarkContainer(Container):
     self.intensity = intensity
     self.duration = 7200
     self.tmux_name = 'benchmark'
+    self.num_interferences = 3
 
   def start(self):
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name))
@@ -314,8 +315,11 @@ l2:
       time.sleep(5)
       util.tmux_command(self.tmux_name, 'make install')
       time.sleep(600)
+    print("making uBench")
     util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; make')
+    print("sleeping...")
     time.sleep(100)
+    print("setting up benchmark")
     self.benchmark()
 
   def benchmark(self):
@@ -326,7 +330,9 @@ l2:
       args = '{0:d}'.format(self.duration)
     else:
       raise Exception('benchmark - not implemented')
-    util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s}'.format(self.metric, args))
+    for i in range(self.num_interferences):
+      print("Starting 1 interfere", i)
+      util.tmux_command(self.tmux_name, '/home/XcontainerBolt/uBench/src/{0:s} {1:s} &'.format(self.metric, args))
 
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
@@ -728,7 +734,7 @@ def setup_containers(args):
     if b is not None:
       b.start()
       b.setup()
-      b.benchmark()
+  #    b.benchmark()
 
     if args.container == 'xcontainer':
       balance_xcontainer(b, m, get_benchmark_processor(args.test))

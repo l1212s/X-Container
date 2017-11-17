@@ -17,7 +17,6 @@ DOCKER_INSPECT_FILTER = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 MEMCACHED_SIZE = 512
 MEMCACHED_THREADS = 4
-NUM_INTERFERENCE = 3
 
 #################################################################################################
 # Common functionality
@@ -114,7 +113,6 @@ def create_readme(args, folder):
   f.write('DATE: {0:s}\n'.format(args.date))
   f.write("BOUND TO PROCESSOR: {0:d}\n".format(util.processor(0)))
   f.write('BENCHMARK TEST: {0:s}\n'.format(args.test))
-  f.write('NUM INTEREFERENCE: {0:s}\n'.format(NUM_INTERFERENCE))
   if args.process == 'memcached':
     f.write('MEMCACHED SIZE(-m): {0:d}M\n'.format(MEMCACHED_SIZE))
     f.write('MEMCACHED THREADS(-t): {0:d}\n'.format(MEMCACHED_THREADS))

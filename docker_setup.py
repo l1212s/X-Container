@@ -18,7 +18,6 @@ XCONTAINER_INSPECT_FILTER = "{{.NetworkSettings.IPAddress}}"
 MEMCACHED_SIZE = 512
 MEMCACHED_THREADS = 4
 NUM_INTERFERENCE = 3
-MEAUSUREMENT_TIME = 60
 
 #################################################################################################
 # Common functionality
@@ -414,10 +413,10 @@ def parse_memcached_results(args, instance_folder, num_connections, cores):
     f.close()
 
 
-def memcached_benchmark(results, instance_folder, num_connections, address, rate, core):
+def memcached_benchmark(results, instance_folder, num_connections, address, rate, core,duration):
   benchmark_file = get_memcached_benchmark_file(instance_folder, rate, num_connections, core)
   command = 'taskset -c {0:d} {1:s}mutated_memcache -z {2:d} -v {3:d} -n {4:d} -s {5:d} -W 10000 {6:s} {7:d} > {8:s}'
-  util.shell_call(command.format(core, MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, num_connections, MEASUREMENT_TIME, args.benchmark_address, rate, benchmark_file), True)
+  util.shell_call(command.format(core, MUTATED_FOLDER, NUM_MEMCACHED_KEYS, MEMCACHED_VALUE_SIZE, num_connections, duration, args.benchmark_address, rate, benchmark_file), True)
 
 
 def run_memcached_benchmark(args):
@@ -438,7 +437,7 @@ def run_memcached_benchmark(args):
     for rate in rates:
       mem_funs = []
       for i in range(args.cores):
-        mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, cores[i]))
+        mem_funs.append(functools.partial(memcached_benchmark, results, instance_folder, num_connections, args.benchmark_address, rate, cores[i], args.duration))
       run_parallel_instances(mem_funs)
   parse_memcached_results(args, instance_folder, num_connections, cores)
 

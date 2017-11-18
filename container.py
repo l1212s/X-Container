@@ -40,7 +40,10 @@ class Container(object):
     raise Exception('Container-ip: Not implemented')
 
   def machine_ip(self):
-    return util.get_ip_address('eno1')
+    ip = util.get_ip_address('eno1')
+    if ip == None or ip == '':
+      ip = util.get_ip_address('enp67s0')
+    return ip
 
   def setup(self):
     raise Exception('Container-setup: Not implemented')
@@ -540,6 +543,7 @@ class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, Benchmark
   def setup(self):
     LinuxContainer.setup(self)
     LinuxContainer.execute_command(self, 'apt-get install -y nginx')
+    time.sleep(5)
     LinuxContainer.execute_command(self, 'truncate -s0 /etc/nginx/nginx.config')
     for line in get_nginx_configuration().split("\n"):
       LinuxContainer.execute_command(self, 'echo "{0:s}" >> /etc/nginx/nginx.config'.format(line))

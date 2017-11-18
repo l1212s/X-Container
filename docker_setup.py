@@ -47,7 +47,7 @@ def run_parallel_instances(fun):
 
 
 def benchmark_address(args):
-  ip_address = '128.253.51.86'
+  ip_address = args.ip
   if args.process == 'nginx':
     port = NGINX_MACHINE_PORT
   elif args.process == 'memcached':
@@ -856,6 +856,7 @@ if __name__ == '__main__':
   parser.add_argument('--threads', type=int, default=10, help='Number of threads')
   parser.add_argument('--date', type=str, default=get_date(), help="Date folder to add benchmark results")
   parser.add_argument('--dry_run', action='store_true', default=False, help="Don't actually run the benchmark. Still parsing output")
+  parser.add_argument('--ip', type=str, default='128.253.51.86')
   args = parser.parse_args()
 
   check_git()

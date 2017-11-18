@@ -80,7 +80,7 @@ def create_benchmark_folder(args):
 def check_last_run(args):
   folder = util.container_folder(args.process, args.container)
   output = util.shell_output("ls {0:s}".format(folder)).strip().split("\n")
-  if len(output) == 0:
+  if len(output) == 0 or (len(output) == 1 and output[0] == ''):
     return
 
   output.sort(reverse=True)

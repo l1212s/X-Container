@@ -299,8 +299,8 @@ l2:
     time.sleep(8)
     util.tmux_command(self.tmux_name, '{0:s} g++'.format(install))
     time.sleep(100)
-    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
-    time.sleep(8)
+#    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+#    time.sleep(8)
 #    util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; truncate -s0 Makefile')
 #    for line in self.benchmark_makefile().split('\n'):
 #      util.tmux_command(self.tmux_name, "echo -e '{0:s}' >> Makefile".format(line))
@@ -580,6 +580,7 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
   def setup(self):
     time.sleep(1)
     DockerContainer.setup(self)
+    util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
     BenchmarkContainer.setup(self)
 
   def destroy(self):

@@ -41,7 +41,7 @@ def check_benchmark(args):
     'cpu',
   ]
 
-  for benchmark in ['memBw', 'memCap']:
+  for benchmark in ['memBw', 'memCap', 'l3']:
     for i in [1, 5, 9]:
       benchmarks.append('{0:s}-{1:d}'.format(benchmark, i))
 

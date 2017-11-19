@@ -327,7 +327,7 @@ l2:
 
   def benchmark(self):
     args = ''
-    if self.metric.startswith('mem'):
+    if self.metric.startswith('mem') or self.metric.startswith('l3'):
       args = '{0:d} {1:d}'.format(self.duration, self.intensity)
     elif self.metric.startswith('cpu'):
       args = '{0:d}'.format(self.duration)
@@ -650,7 +650,7 @@ def parse_arguments():
   util.check_benchmark(args)
   parts = args.test.split('-')
   metric = parts[0]
-  if metric.startswith('mem'):
+  if metric.startswith('mem') or metric.startswith('l3'):
     intensity = int(parts[1])
   else:
     intensity = 0

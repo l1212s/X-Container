@@ -28,7 +28,8 @@ def shell_output(command, show_command=False):
 
 
 def container_folder(process, container):
-  shell_call("mkdir benchmark")
+  if not os.path.isdir("benchmark"):
+    shell_call("mkdir benchmark")
   return "benchmark/{0:s}-{1:s}".format(process, container)
 
 

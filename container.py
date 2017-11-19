@@ -41,7 +41,7 @@ class Container(object):
 
   def machine_ip(self):
     ip = util.get_ip_address('eno1')
-    if ip == None or ip == '':
+    if ip is None or ip == '':
       ip = util.get_ip_address('enp67s0')
     return ip
 
@@ -106,7 +106,7 @@ class DockerContainer(Container):
     util.shell_call('docker rm {0:s}'.format(self.name))
 
   def execute_command(self, command):
-    util.shell_call('docker exec -it {0:s} {1:s}'.format(self.name, command), True)
+    util.shell_call('docker exec  --user root -it {0:s} {1:s}'.format(self.name, command), True)
 
   def config(self):
     raise Exception("DockerContainer: config - not implemented")
@@ -245,6 +245,9 @@ class BenchmarkContainer(Container):
   def start(self):
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name))
 
+  def destroy(self):
+    util.shell_call('tmux kill-session -s {0:s}'.format(self.tmux_name))
+
   def benchmark_makefile(self):
     return '''#.ONESHELL:
 default:
@@ -367,25 +370,6 @@ class ApplicationContainer(Container):
     print("To benchmark run 'python docker_setup.py -c {0:s} -p {1:s}'".format(self.container, self.application))
 
 
-class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached):
-  def __init__(self):
-    DockerContainer.__init__(self, 'memcached_container', 'memcached')
-
-  def config(self):
-    return ""
-
-  def ports(self):
-    return '0.0.0.0:{0:d}:{0:d}'.format(self.port)
-
-  def args(self):
-    return Memcached.start_command(self)
-
-  def setup(self):
-    DockerContainer.setup(self)
-    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
-    ApplicationContainer.benchmark_message(self)
-
-
 def get_nginx_configuration():
   return '''
 user  www-data;
@@ -428,14 +412,9 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     self.sameContainer = sameContainer
 
     if sameContainer:
-      print("same")
       BenchmarkContainer.__init__(self, metric, intensity, self.name, 'docker', 'nginx', 'default')
 
-
   def config(self):
-    return ''
-
-  def ports(self):
     return ''
 
   def ports(self):
@@ -458,8 +437,6 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
   def setup_benchmark(self):
     util.tmux_command(self.tmux_name, 'docker exec -it {0:s} /bin/bash'.format(self.name))
     BenchmarkContainer.setup(self, False)
-    #setup_nginx_configuration(self.config_file)
-    #DockerContainer.start(self)
 
   def setup(self):
     DockerContainer.setup(self)
@@ -476,6 +453,40 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
     util.shell_call('tmux kill-session -t {0:s}'.format("benchmark"))
 
 
+class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached, BenchmarkContainer):
+  def __init__(self, sameContainer=False, metric=None, intensity=None):
+    DockerContainer.__init__(self, 'memcached_container', 'memcached')
+    util.shell_call('tmux new -s {0:s} -d'.format("benchmark"))
+    self.sameContainer = sameContainer
+
+    if sameContainer:
+      BenchmarkContainer.__init__(self, metric, intensity, self.name, 'docker', 'memcached', 'default')
+
+  def destroy(self):
+    DockerContainer.destroy(self)
+    if self.sameContainer:
+      BenchmarkContainer.destroy(self)
+  def setup_benchmark(self):
+    util.tmux_command(self.tmux_name, 'docker exec --user root -it {0:s} /bin/bash'.format(self.name))
+    BenchmarkContainer.setup(self, False)
+  def config(self):
+    return ""
+
+  def ports(self):
+    return '0.0.0.0:{0:d}:{0:d}'.format(self.port)
+
+  def args(self):
+    return Memcached.start_command(self)
+
+  def setup(self):
+    DockerContainer.setup(self)
+    if self.sameContainer:
+      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
+      self.setup_benchmark()
+    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+    ApplicationContainer.benchmark_message(self)
+
+
 class MemcachedXContainer(XContainer, MemcachedDockerContainer):
   def __init__(self):
     XContainer.__init__(self, 'memcached_container', 'memcached', 1)
@@ -484,6 +495,7 @@ class MemcachedXContainer(XContainer, MemcachedDockerContainer):
     XContainer.setup(self)
     MemcachedDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     MemcachedDockerContainer.benchmark_message(self)
+
 
 class NginxXContainer(XContainer, NginxDockerContainer):
   def __init__(self, sameContainer=False, metric=None, intensity=None):
@@ -531,6 +543,7 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached, B
       BenchmarkContainer.setup(self, False)
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
+
 
 class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, BenchmarkContainer):
   def __init__(self, sameContainer=False, metric=None, intensity=None):
@@ -690,7 +703,10 @@ def create_application_container(args, sameContainer=False):
         m = NginxLinuxContainer(sameContainer)
   elif args.container == 'docker':
     if args.application == 'memcached':
-      m = MemcachedDockerContainer()
+      if sameContainer:
+        m = MemcachedDockerContainer(sameContainer, args.metric, args.intensity)
+      else:
+        m = MemcachedDockerContainer(sameContainer)
     else:
       if sameContainer:
         m = NginxDockerContainer(sameContainer, args.metric, args.intensity)

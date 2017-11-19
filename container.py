@@ -57,6 +57,10 @@ class LinuxContainer(Container):
     Container.__init__(self, name, 'linux', application, processor)
     self.tmux_name = 'linux'
 
+  def copy_folder(self, folder):
+    util.shell_call('find {0:s} | cpio -o | lxc-attach --name {1:s} -- cpio -i -d -v'.format(folder, self.name), True)
+    self.execute_command('mv {0:s} home/{0:s}'.format(folder))
+
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
     util.shell_call('lxc-stop --name {0:s}'.format(self.name))
@@ -550,7 +554,8 @@ class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, Benchmark
     LinuxContainer.execute_command(self, '/etc/init.d/nginx restart')
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     if self.sameContainer:
-      BenchmarkContainer.setup(self, False)
+      LinuxContainer.copy_folder(self, 'XcontainerBolt')
+      self.setup_benchmark()
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
 

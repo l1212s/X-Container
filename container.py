@@ -350,11 +350,11 @@ l2:
 
 class ApplicationContainer(Container):
   def setup_port_forwarding(self, machine_ip, machine_port, container_ip, container_port, bridge_ip):
-    util.shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip))
+    util.shell_call('iptables -I FORWARD -p tcp -d {0:s} -j ACCEPT'.format(container_ip), True)
     time.sleep(1)
-    util.shell_call('iptables -I FORWARD -p tcp -s {0:s} -j ACCEPT'.format(container_ip))
+    util.shell_call('iptables -I FORWARD -p tcp -s {0:s} -j ACCEPT'.format(container_ip), True)
     time.sleep(1)
-    util.shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port))
+    util.shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port), True)
     time.sleep(1)
     command = 'iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
     util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
@@ -392,6 +392,7 @@ http {
     keepalive_timeout  120;
 
     include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
 }
 '''
 
@@ -560,10 +561,10 @@ class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, Benchmark
   def setup(self):
     LinuxContainer.setup(self)
     LinuxContainer.execute_command(self, 'apt-get install -y nginx')
-    time.sleep(5)
-    LinuxContainer.execute_command(self, 'truncate -s0 /etc/nginx/nginx.config')
+    time.sleep(15)
+    LinuxContainer.execute_command(self, 'truncate -s0 /etc/nginx/nginx.conf')
     for line in get_nginx_configuration().split("\n"):
-      LinuxContainer.execute_command(self, 'echo "{0:s}" >> /etc/nginx/nginx.config'.format(line))
+      LinuxContainer.execute_command(self, "echo '{0:s}' >> /etc/nginx/nginx.conf".format(line))
     LinuxContainer.execute_command(self, '/etc/init.d/nginx restart')
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     if self.sameContainer:

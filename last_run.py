@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import sys
 import util
 
 NUM_CLIENTS = re.compile('NUM CLIENTS: ([0-9]+)')
@@ -40,10 +41,12 @@ def last_run(args):
       continue
     
     print(readme_file)    
-    print(output)
+    if args.output:
+      print(output)
     i += 1
     if i == args.instances:
       return
+  sys.exit(1)
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
@@ -52,6 +55,7 @@ def parse_arguments():
   parser.add_argument('-t', '--test', required=True, help='Test to find')
   parser.add_argument('-n', '--num_clients', type=int, default=1, help='Number of clients or cores to find')
   parser.add_argument('-i', '--instances', type=int, default=1, help='Number of runs to return')
+  parser.add_argument('-o', '--output', action='store_true', default=False, help='Show run output')
   args = parser.parse_args()
   util.check_benchmark(args)
   return args

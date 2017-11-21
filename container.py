@@ -582,6 +582,7 @@ class BenchmarkLinuxContainer(LinuxContainer, BenchmarkContainer):
 
   def setup(self):
     LinuxContainer.setup(self)
+    LinuxContainer.copy_folder(self, 'XcontainerBolt')
     util.tmux_command(self.tmux_name, 'lxc-attach --name {0:s}'.format(self.name))
     time.sleep(2)
     BenchmarkContainer.setup(self)

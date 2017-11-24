@@ -57,6 +57,8 @@ def create_json_graph(args):
   with open('json/{0:s}'.format(args.json)) as f:
     traces = json.load(f)
   for trace in traces['traces']:
+    if len(trace['dates']) == 0:
+      continue
     points = fetch_points(trace['process'], trace['container'], trace['dates'], args.metric)
     
     xs = map(lambda p: p[0], points)

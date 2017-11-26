@@ -61,6 +61,10 @@ class LinuxContainer(Container):
     util.shell_call('find {0:s} | cpio -o | lxc-attach --name {1:s} -- cpio -i -d -v'.format(folder, self.name), True)
     self.execute_command('mv {0:s} home/{0:s}'.format(folder))
 
+  def setup_benchmark(self):
+    util.tmux_command(self.tmux_name, 'lxc-attach --name {0:s}'.format(self.name))
+    BenchmarkContainer.setup(self, False)
+
   def destroy(self):
     util.shell_call('tmux kill-session -t {0:s}'.format(self.tmux_name))
     util.shell_call('lxc-stop --name {0:s}'.format(self.name))
@@ -541,7 +545,8 @@ class MemcachedLinuxContainer(LinuxContainer, ApplicationContainer, Memcached, B
     time.sleep(1)
     util.shell_call("lxc-cgroup -n {0:s} cpuset.cpus {1:d}".format(self.name, self.processor))
     if self.sameContainer:
-      BenchmarkContainer.setup(self, False)
+      LinuxContainer.copy_folder(self, 'XcontainerBolt')
+      self.setup_benchmark()
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
 
@@ -553,10 +558,6 @@ class NginxLinuxContainer(LinuxContainer, ApplicationContainer, Nginx, Benchmark
 
     if sameContainer:
       BenchmarkContainer.__init__(self, metric, intensity, self.name, 'linux', 'nginx', 'default')
-
-  def setup_benchmark(self):
-    util.tmux_command(self.tmux_name, 'lxc-attach --name {0:s}'.format(self.name))
-    BenchmarkContainer.setup(self, False)
 
   def setup(self):
     LinuxContainer.setup(self)

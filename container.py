@@ -41,8 +41,13 @@ class Container(object):
 
   def machine_ip(self):
     ip = util.get_ip_address('eno1')
+    print("ip1", ip)
     if ip is None or ip == '':
       ip = util.get_ip_address('enp67s0')
+      print("ip2", ip)
+      if ip is None or ip == '':
+        ip = util.get_ip_address('p1p1')
+        print("ip3", ip)
     return ip
 
   def setup(self):
@@ -138,7 +143,8 @@ class DockerContainer(Container):
     return '-P --cpuset-cpus={0:d} --cpuset-mems={1:d}'.format(self.processor, self.mem)
 
   def id(self):
-    return util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(self.name)).strip()
+    docker_id = util.shell_output('docker inspect --format="{{{{.Id}}}}" {0:s}'.format(self.name)).strip()
+    return docker_id
 
   def start(self):
     v = ''
@@ -149,7 +155,7 @@ class DockerContainer(Container):
     if self.ports() != '':
       p = '-p {0:s}'.format(self.ports())
 
-    util.shell_call('docker run --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, self.cpuset(), v, p, self.application, self.args()), True)
+    util.shell_call('docker run -it --entrypoint /bin/bash --name {0:s} {1:s} {2:s} {3:s} -d {4:s} {5:s}'.format(self.name, self.cpuset(), v, p, self.application, self.args()), True)
     time.sleep(5)
 
   def setup(self):
@@ -162,6 +168,8 @@ class XContainer(DockerContainer):
     Container.__init__(self, name, 'xcontainer', application, processor)
     self.tmux_name = '{0:s}_xcontainer'.format(name)
     self.ip_offset = ip_offset
+    util.shell_call("service docker restart")
+    time.sleep(5)
 
   def xconfig(self):
     nodeId = 0
@@ -222,7 +230,10 @@ pool="Pool-node{0:d}"
     return ".".join(parts)
 
   def machine_ip(self):
-    return util.get_ip_address('em1')
+    ip = util.get_ip_address('em1')
+    if ip is None or ip == '':
+      ip = util.get_ip_address('p1p1')
+    return ip
 
   def start(self):
     util.shell_call('tmux new -s {0:s} -d'.format(self.tmux_name), True)
@@ -300,21 +311,23 @@ l2:
     if useYum:
       command = 'yum'
       install = 'yum -y install'
+    util.tmux_command(self.tmux_name, "echo 'nameserver 8.8.8.8' | tee /etc/resolv.conf > /dev/null")
+    time.sleep(1)
     util.tmux_command(self.tmux_name, '{0:s} update'.format(command))
     time.sleep(5)
-#    util.tmux_command(self.tmux_name, '{0:s} git'.format(install))
-#    time.sleep(40)
+    util.tmux_command(self.tmux_name, '{0:s} git'.format(install))
+    time.sleep(40)
     util.tmux_command(self.tmux_name, '{0:s} make'.format(install))
     time.sleep(5)
-#    util.tmux_command(self.tmux_name, '{0:s} ca-certificates'.format(install))
-#    time.sleep(8)
+    util.tmux_command(self.tmux_name, '{0:s} ca-certificates'.format(install))
+    time.sleep(8)
     util.tmux_command(self.tmux_name, '{0:s} g++'.format(install))
     time.sleep(100)
-#    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
-#    time.sleep(8)
-#    util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; truncate -s0 Makefile')
-#    for line in self.benchmark_makefile().split('\n'):
-#      util.tmux_command(self.tmux_name, "echo -e '{0:s}' >> Makefile".format(line))
+    util.tmux_command(self.tmux_name, 'cd /home; git clone https://sj677:d057c5e8f966db42a6f467c6029da686fdcf4bb4@github.coecis.cornell.edu/SAIL/XcontainerBolt.git')
+    time.sleep(8)
+    util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; truncate -s0 Makefile')
+    for line in self.benchmark_makefile().split('\n'):
+      util.tmux_command(self.tmux_name, "echo -e '{0:s}' >> Makefile".format(line))
     if False:
       util.tmux_command(self.tmux_name, 'yum -y install libmpc-devel mpfr-devel gmp-devel')
       time.sleep(10)
@@ -332,9 +345,9 @@ l2:
 #    print("making uBench")
     util.tmux_command(self.tmux_name, 'cd /home/XcontainerBolt/uBench; make')
     print("sleeping...")
-    time.sleep(100)
+    time.sleep(10)
     print("setting up benchmark")
-    self.benchmark()
+    #self.benchmark()
 
   def benchmark(self):
     args = ''
@@ -361,13 +374,13 @@ class ApplicationContainer(Container):
     util.shell_call('iptables -I INPUT -m state --state NEW -p tcp -m multiport --dport {0:d} -s 0.0.0.0/0 -j ACCEPT'.format(machine_port), True)
     time.sleep(1)
     command = 'iptables -t nat -I PREROUTING --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
-    util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
+    util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port), True)
     time.sleep(1)
     command = 'iptables -t nat -I POSTROUTING -p tcp --dst {0:s} --dport {1:d} -j SNAT --to-source {2:s}'
-    util.shell_call(command.format(container_ip, container_port, bridge_ip))
+    util.shell_call(command.format(container_ip, container_port, bridge_ip), True)
     time.sleep(1)
     command = 'iptables -t nat -I OUTPUT --dst {0:s} -p tcp --dport {1:d} -j DNAT --to-destination {2:s}:{3:d}'
-    util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port))
+    util.shell_call(command.format(machine_ip, machine_port, container_ip, container_port), True)
     time.sleep(1)
 
   def benchmark_message(self):
@@ -439,18 +452,18 @@ class NginxDockerContainer(DockerContainer, ApplicationContainer, Nginx, Benchma
       util.tmux_command(self.docker_tmux_name, "echo '{0:s}' >> etc/nginx/nginx.conf".format(line))
     util.tmux_command(self.docker_tmux_name, 'exit')
 
-  def setup_benchmark(self):
+  def setup_benchmark(self, useYum=False):
     util.tmux_command(self.tmux_name, 'docker exec -it {0:s} /bin/bash'.format(self.name))
-    BenchmarkContainer.setup(self, False)
+    BenchmarkContainer.setup(self, True)
 
-  def setup(self):
+  def setup(self, useYum=False):
     DockerContainer.setup(self)
     self.setup_config()
-    if self.sameContainer:
-      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
-      self.setup_benchmark()
-    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
-    ApplicationContainer.benchmark_message(self)
+#    if self.sameContainer:
+#      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
+#      self.setup_benchmark()
+#    ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
+#    ApplicationContainer.benchmark_message(self)
 
   def destroy(self):
     DockerContainer.destroy(self)
@@ -486,7 +499,7 @@ class MemcachedDockerContainer(DockerContainer, ApplicationContainer, Memcached,
   def setup(self):
     DockerContainer.setup(self)
     if self.sameContainer:
-      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
+#      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
       self.setup_benchmark()
     ApplicationContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
     ApplicationContainer.benchmark_message(self)
@@ -502,27 +515,29 @@ class MemcachedXContainer(XContainer, MemcachedDockerContainer):
     MemcachedDockerContainer.benchmark_message(self)
 
 
-class NginxXContainer(XContainer, NginxDockerContainer):
+class NginxXContainer(XContainer, NginxDockerContainer, BenchmarkContainer):
   def __init__(self, sameContainer=False, metric=None, intensity=None):
-    print("init 1")
     NginxDockerContainer.__init__(self, sameContainer, metric, intensity)
-    XContainer.__init__(self, 'nginx_container', 'nginx', 1)
-    print("init 2")
+    XContainer.__init__(self, 'nginx_xcontainer', 'nginx', 2)
 
   def setup(self):
-    print("setup 1")
     NginxDockerContainer.setup_config(self)
-    print("setup 2")
-    if self.sameContainer:
-      NginxDockerContainer.setup_benchmark(self)
-    print("setup 3")
-    #util.shell_call("service docker restart")
-    #XContainer.setup(self)
+#    if self.sameContainer:
+#      util.shell_call('docker cp XcontainerBolt {0:s}:/home/XcontainerBolt'.format(self.name), True)
+#      NginxDockerContainer.setup_benchmark(self, True)
+    util.shell_call("service docker restart")
+    XContainer.setup(self)
     NginxDockerContainer.setup_port_forwarding(self, self.machine_ip(), self.port, self.ip(), self.port, self.bridge_ip())
-    print("setup 4")
     NginxDockerContainer.benchmark_message(self)
-    #NginxDockerContainer.benchmark(self)
-    print("setup 5")
+    util.tmux_command(self.tmux_name, "echo 'nameserver 8.8.8.8' | tee /etc/resolv.conf > /dev/null")
+    util.tmux_command(self.tmux_name, 'apt-get update')
+    time.sleep(20)
+    util.tmux_command(self.tmux_name, 'apt-get install -y curl')
+    time.sleep(30)
+    util.tmux_command(self.tmux_name, "nginx")
+    if self.sameContainer:
+      BenchmarkContainer.setup(self, False)
+      BenchmarkContainer.benchmark(self)
 
   def destroy(self):
     XContainer.destroy(self)
@@ -620,21 +635,25 @@ class BenchmarkDockerContainer(DockerContainer, BenchmarkContainer):
   def start(self):
     BenchmarkContainer.start(self)
     time.sleep(10)
-    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -i ubuntu /bin/bash'.format(self.name, self.cpuset()))
+    print('starting docker container', self.name)
+#    util.tmux_command(self.tmux_name, "service docker restart")
+    util.tmux_command(self.tmux_name, 'docker run --name {0:s} {1:s} -d -i ubuntu /bin/bash'.format(self.name, self.cpuset()))
 
 
 class BenchmarkXContainer(XContainer, BenchmarkDockerContainer, BenchmarkContainer):
   def __init__(self, metric, intensity, application, processor):
     name = 'benchmark_xcontainer'
-    XContainer.__init__(self, name, 'bash', 2, processor)
+    XContainer.__init__(self, name, 'bash', 5, processor)
     BenchmarkDockerContainer.__init__(self, metric, intensity, application, processor, name, 'xcontainer')
 
   def setup(self):
-    BenchmarkContainer.setup(self)
-    util.shell_call('sudo docker stop {0:s}'.format(self.name))  # TODO: Replace
-    time.sleep(5)
+    time.sleep(10)
+    util.shell_call("service docker restart")
+    #util.shell_call('sudo docker stop {0:s}'.format(self.name))  # TODO: Replace
     XContainer.setup(self)
     time.sleep(10)
+    BenchmarkContainer.setup(self, False)
+    BenchmarkContainer.benchmark(self)
 
   def destroy(self):
     XContainer.destroy(self)
@@ -682,13 +701,13 @@ def parse_arguments():
 
 def balance_xcontainer(b, m, p):
   util.shell_call('python /root/x-container/irq-balance.py')
-  #util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(m.name))
+  util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(m.name))
   util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(m.name, m.processor), True)
   if b is not None:
-    #if p == 'logical':
-    #  util.shell_call('xl cpupool-migrate {0:s} Pool-node1'.format(b.name), True)
-    #else:
-      #util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(b.name), True)
+    if p == 'logical':
+      util.shell_call('xl cpupool-migrate {0:s} Pool-node1'.format(b.name), True)
+    else:
+      util.shell_call('xl cpupool-migrate {0:s} Pool-node0'.format(b.name), True)
     util.shell_call('xl vcpu-pin {0:s} 0 {1:d}'.format(b.name, b.processor), True)
 
 
@@ -743,8 +762,8 @@ def create_benchmark_container(args):
 
 
 def setup_containers(args):
-  #if args.container == 'xcontainer':
-  #  util.shell_call('xl cpupool-numa-split')
+  if args.container == 'xcontainer':
+    util.shell_call('xl cpupool-numa-split')
   if 'same-container' in args.test:
     m = create_application_container(args, True)
     b = None
